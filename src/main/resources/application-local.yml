@@ -1,0 +1,101 @@
+server:
+  port: 8082
+
+management:
+  endpoint:
+    health:
+      enabled: true
+
+tlf:
+  logging:
+    enabled: true
+    disable-json-format-in-console: true
+  lending: {}
+
+spring:
+  application:
+    name: core-architecture-ri
+  datasource:
+    url: ${BMS_DATABASE_URL}
+    username: ${BMS_DATABASE_USERNAME}
+    password: ${BMS_DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+  thread-executor: virtual
+
+azure:
+  eventhub:
+    connection-string: ${EVENTHUB_CONNECTION_STRING}
+    event-hub-name: ${EVENTHUB_NAME}
+
+springdoc:
+  swagger-ui:
+    use-root-path: true
+
+lib-security:
+  enabled: false  #PARAMETRO OBRIGATORIO
+  jwks:
+    cacheLifespan: 1440
+    refreshTime: 120
+    url: "https://autenticainthml.redecorp.br/vivooauth2/security"
+  white-list:
+    - path: "/swagger-ui/**"
+      methods: "all"
+    - path: "/swagger-resources/**"
+      methods: "all"
+    - path: "/v2/api-docs/**"
+      methods: "all"
+    - path: "/v3/api-docs/**"
+      methods: "all"
+    - path: "/actuator/health/**"
+      methods: "all"
+  user-info:
+    oam-enabled: false
+    scopeOauthClaim: oracle.oauth.scope
+    scopes:
+      default:
+        uri: https://autenticainthml.redecorp.br/ms_oauth/resources/${scope}/me
+        groupAttributeKey: '_Groups'
+        nameAttributeKey: OAM_NOME
+
+eureka:
+  client:
+    enabled: ${FEATURES_TOOGLE_ENABLE_EUREKA:false}
+    register-with-eureka: ${EUREKA_CLIENT_SHOULD_REGISTER_WITH_EUREKA:true}
+    fetch-registry: ${EUREKA_CLIENT_SHOULD_FETCH_REGISTRY:true}
+    g-zip-content: ${EUREKA_CLIENT_SHOULD_GZIP_CONTENT:true}
+    registry-fetch-interval-seconds: ${EUREKA_CLIENT_REGISTRY_FETCH_INTERVAL_SECONDS:5}
+    filter-only-up-instances: ${EUREKA_CLIENT_SHOULD_FILTER_ONLY_UP_INSTANCES:true}
+    initial-instance-info-replication-interval-seconds: 40
+    instance-info-replication-interval-seconds: ${EUREKA_CLIENT_INSTANCE_INFO_REPLICATION_INTERVAL_SECONDS:30}
+    disable-delta: ${EUREKA_CLIENT_SHOULD_DISABLE_DELTA:false}
+    on-demand-update-status-change: ${EUREKA_CLIENT_SHOULD_ON_DEMAND_UPDATE_STATUS_CHANGE:true}
+    service-url:
+      defaultZone: ${EUREKA_REGISTER_URL:http://localhost:8761/eureka}
+  instance:
+    non-secure-port: ${EUREKA_INSTANCE_PORT:8082}
+    non-secure-port-enabled: ${EUREKA_INSTANCE_NON_SECURE_PORT_ENABLED:true}
+    secure-port: ${EUREKA_INSTANCE_SECURE_PORT:443}
+    secure-port-enabled: ${EUREKA_INSTANCE_SECURE_PORT_ENABLED:false}
+    app-group-name: ${EUREKA_INSTANCE_APP_GROUP_NAME:system}
+    appname: ${spring.application.name}
+    instance-enabled-onit: ${EUREKA_INSTANCE_INSTANCE_ENABLED_ON_INIT:false}
+    prefer-ip-address: ${EUREKA_INSTANCE_PREFER_IP_ADDRESS:true}
+    lease-renewal-interval-in-seconds: ${EUREKA_INSTANCE_LEASE_RENEWAL_INTERVAL_IN_SECONDS:10}
+    lease-expiration-duration-in-seconds: ${EUREKA_INSTANCE_LEASE_EXPIRATION_DURATION_IN_SECONDS:20}
+    status-page-url-path: ${EUREKA_INSTANCE_STATUS_PAGE_URL_PATH:/actuator/info}
+    health-check-url-path: ${EUREKA_INSTANCE_HEALTH_CHECK_URL_PATH:/actuator/health}
+    metadata-map:
+      system: ""
+      domain: ""
+      team: ""

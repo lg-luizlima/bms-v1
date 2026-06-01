@@ -1,0 +1,36 @@
+#arquivo de links
+    - url: https://example.com/user
+      title: Usuários
+      icon: user
+
+    - url: https://example.com/group
+      title: Grupo Slack
+      icon: group
+
+    - url: https://example.com/cloud
+      title: Rancher/GCP/AWS/AKS
+      icon: cloud
+
+    - url: https://example.com/dashboard
+      title: Dashboard (Skywalking)
+      icon: dashboard
+
+    - url: https://example.com/help
+      title: Jira
+      icon: help
+
+    - url: https://example.com/web
+      title: Website
+      icon: web
+
+    - url: https://example.com/alert
+      title: Alertas (Skywalking)
+      icon: alert
+
+    - url: https://example.com/alert
+      title: Logs (Skywalking)
+      icon: alert
+
+    - url: https://example.com/alert
+      title: Trace (Skywalking)
+      icon: alert

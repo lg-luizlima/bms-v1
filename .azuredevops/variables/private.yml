@@ -1,0 +1,11 @@
+variables:
+- name: global_poollImage 
+  value: 'default'
+- name: HELM_REGISTRY_ACR_ENABLED 
+  value: true
+- name: HELM_REGISTRY_NEXUS_ENABLED 
+  value: true
+- name: DEFAULT_GENERIC_JAVA_CHART_VERSION 
+  value: '1.0.30'
+- name: DEFAULT_GENERIC_JAVA_CHART_NAME
+  value: generic-java-microservice

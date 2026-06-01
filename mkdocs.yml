@@ -1,0 +1,44 @@
+site_name: "ms-vivopay-credit-consent-bms-v1"
+site_description: "O microsserviço de Consentimentos atua como um roteador dinâmico de compliance."
+
+#theme: readthedocs
+
+nav:
+  - Overview: index.md
+  - Diagrams: diagrams.md 
+  - Pull Request: pull-request.md
+  - Quality Gate: quality-gate.md
+  - Versioning: versioning.md
+  - Continuous Integration: ci.md
+  - Changelog: changelog.md
+  - Extras: extras.md
+  
+
+plugins:
+  - techdocs-core
+  - search
+  - diagrams:
+      file_extension: ".diagrams.py"
+      max_workers: 5
+
+markdown_extensions:
+  - plantuml_markdown
+  - abbr
+  - attr_list
+  - pymdownx.snippets
+  - pymdownx.tabbed
+  - markdown_inline_graphviz
+  - admonition
+  - pymdownx.details
+  - pymdownx.keys
+  - pymdownx.highlight:
+      linenums: true
+      linenums_style: pymdownx.inline
+      use_pygments: true
+
+  - pymdownx.superfences
+
+extra_javascript:
+  - https://unpkg.com/mermaid@7.1.2/dist/mermaid.min.js
+
+  

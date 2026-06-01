@@ -1,0 +1,246 @@
+replicaCount: 2
+
+# See https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
+
+# See https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+podAnnotations: {}
+  
+# See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+podSecurityContext: {}
+  # fsGroup: 2000
+
+# See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+# See https://kubernetes.io/docs/concepts/services-networking/service/
+service:
+  type: ClusterIP
+  port: 80
+
+# container settings
+container:
+  port: 8082
+  schema: HTTP
+
+# See https://kubernetes.io/docs/concepts/services-networking/ingress/
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
+      grpc_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
+  hosts:
+    - host: prd-ms-vivopay-credit-consent-bms-v1.change.me
+      paths: 
+      - "/"
+  tls: []
+
+# See https://linkerd.io/2/overview/
+#linkerd:
+#  inject: "disabled"
+#  proxyCpuLimit: "500m"
+#  proxyCpuRequest: "20m"
+#  proxyMemoryLimit: "512Mi"
+#  proxyMemoryRequest: "50Mi"
+
+# See https://keda.sh/
+#keda:
+#  enabled: false
+#  pollingInterval: 10   # default 30
+#  cooldownPeriod: 60    # default 300
+#  minReplicaCount: 0    # default 0
+#  maxReplicaCount: 64   # default 100
+#  valueToYaml: [] # Types of triggers
+  ## see https://keda.sh/docs/1.5/scalers/apache-kafka/
+  # - type: kafka
+  #   metadata:
+  #     # brokerList: kafka.svc:9092 - deprecated
+  #     bootstrapServers: kafka.svc:9092
+  #     consumerGroup: my-group
+  #     topic: test-topic
+  #     lagThreshold: '5'
+
+  ## see https://keda.sh/docs/1.5/scalers/prometheus/
+  # - type: prometheus
+  #   metadata:
+  #     # Required
+  #     serverAddress: http://<prometheus-host>:9090
+  #     metricName: http_requests_total
+  #     threshold: '100'
+  #     query: sum(rate(http_requests_total{deployment="my-deployment"}[2m])) # Note: query must return a vector/scalar single element response
+  
+  ## See https://keda.sh/docs/1.5/scalers/azure-service-bus/
+  # - type: azure-servicebus
+  #   metadata:
+  #     # Required: queueName OR topicName and subscriptionName
+  #     queueName: functions-sbqueue
+  #     # or
+  #     topicName: functions-sbtopic
+  #     subscriptionName: sbtopic-sub1
+  #     # Optional, required when pod identity is used
+  #     namespace: service-bus-namespace
+  #     # Optional, can use TriggerAuthentication as well
+  #     connection: SERVICEBUS_CONNECTIONSTRING_ENV_NAME # This must be a connection string for a queue itself, and not a namespace level (e.g. RootAccessPolicy) connection string [#215](https://github.com/kedacore/keda/issues/215)
+  #     # Optional
+  #     queueLength: "5" # Optional. Subscription length target for HPA. Default: 5 messages
+  
+  ## see https://keda.sh/docs/1.5/scalers/aws-sqs/
+  # - type: aws-sqs-queue
+  #   metadata:
+  #     # Required: queueURL
+  #     queueURL: https://sqs.eu-west-1.amazonaws.com/account_id/QueueName
+  #     queueLength: "5"  # Default: "5"
+  #     # Required: awsRegion
+  #     awsRegion: "eu-west-1" 
+  #     identityOwner: pod | operator # Optional. Default: pod
+    
+# See https://istio.io/
+# istio:
+#   # Enabled istio service mesh
+#   enabled: false
+#   # Enabled istio release canary
+#   canaryEnabled: false
+#   # See https://istio.io/latest/docs/tasks/traffic-management/circuit-breaking/
+#   circuitBreak:
+#     connectionPool:
+#       # Enabled circuit break
+#       enabled: false
+#       # The maximum number of connections to a backend. Any excess connection will be pending in
+#       # a queue. You can modify this number by changing the maxConnections field.
+#       maxConnections: 10
+#       # The maximum number of pending requests to a backend. Any excess pending requests will be 
+#       # denied. You can modify this number by changing the http1MaxPendingRequests field.
+#       http1MaxPendingRequests: 50
+#       # The maximum number of requests in a cluster at any given time. You can modify this 
+#       # number by changing the maxRequestsPerConnection field.
+#       maxRequestsPerConnection: 10 
+#   # See https://istio.io/latest/docs/reference/config/networking/virtual-service/
+#   virtualService:
+#     hosts: 
+#       - "microservice.example"
+    
+#     # See https://istio.io/latest/docs/reference/config/networking/virtual-service/#CorsPolicy
+#     allowOrigins: ["*"]
+#     allowCredentials: True
+#     allowHeaders: []
+#     allowMethods: ["POST", "GET", "PUT", "DELETE", "OPTIONS", "PATCH", "TRACE", "HEAD", "CONNECT" ]
+
+# See https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# See https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+autoscaling:
+  enabled: true
+  istioEnabled: false
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+
+# See https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+nodeSelector: {}
+
+# See https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+tolerations: []
+
+# See https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/
+affinity: {}
+
+# See https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+liveness:
+  enabled: true
+  failureThreshold: 3
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  successThreshold: 1
+  timeoutSeconds: 120
+  healthCheck: /actuator/health
+
+# See https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+readiness:
+  enabled: true
+  failureThreshold: 3
+  periodSeconds: 10
+  successThreshold: 1
+  timeoutSeconds: 120
+  healthCheck: /actuator/health
+
+####################################################################################################################
+#                                          MICROSERVICE SECTION                                                    #
+####################################################################################################################
+# Microservice default Timezone
+timezone: "America/Sao_Paulo"
+
+# Name of your microservice, this name will be registered in service discovery,
+# so it is important to follow a pattern of names and that this name is not too long.
+# Ex: cac-sample-microservice.
+applicationName: "ms-vivopay-credit-consent-bms-v1"
+applicationVersion: "/ms-vivopay-credit-consent-bms-v1/v1"
+
+# Service discovery settings.
+# .net see https://steeltoe.io/service-discovery/get-started/eureka and https://steeltoe.io/docs/2/discovery/netflix-eureka#eureka-settings
+# java see https://www.baeldung.com/spring-cloud-netflix-eureka
+# Before enabling this feature, it is necessary to perform the setup on the cluster. Contact the support team to find out how to enable this feature.
+eureka:
+  enabled: "false"
+  client:
+    shouldRegisterWithEureka: "true"
+    serviceUrl: "http://vivo-service-discovery.msv-tools:8761/eureka"
+  instance:
+    port: "8082"
+    appGroupName: "core-crédito-vivo-pay"
+    statusPageUrlPath: "/actuator/info"
+    healthCheckUrlPath: "/actuator/health"
+    
+# Additional keys that will be added to the configmap.
+# See the examples below.
+configMapKeys: {}
+  # key: value
+
+  # configuration: |
+  #   #!/bin/bash
+  #   echo teste ..  
+
+# Environment variables that will be used by the worker.
+# See the example below.
+applicationVariables: []
+# - name: MY_VARIABLE_NAME
+#   value: "MY VARIABLE VALUE"
+
+# - name: MY_VARIABLE_NAME2
+#   valueFrom:
+#     configMapKeyRef:    
+#       name: MY_CONFIGMAP_NAME
+#       key:  MY_CONFIGMAP_KEY
+
+volumes:
+#- name: my-volume
+#  persistentVolumeClaim:
+#  claimName: my-volume-claim-name
+#- name: my-volume-2
+#  persistentVolumeClaim:
+#  claimName: my-volume-2-claim-name
+
+volumeMounts:
+#- name: my-volume
+#  mountPath: /my_volume
+#- name: my-volume-2
+#  mountPath: /my_volume_2

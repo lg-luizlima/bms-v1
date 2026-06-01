@@ -1,0 +1,62 @@
+#+----------------------------------------------------------+
+#|               Evite alterar este arquivo                 |
+#|              Só altere se for recomendado                |
+#| Alterações erradas podem impactar a entrega da aplicação |
+#+----------------------------------------------------------+
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ms-vivopay-credit-consent-bms-v1
+  namespace: azure
+  description: "O microsserviço de Consentimentos atua como um roteador dinâmico de compliance."
+  links:
+    $yaml: catalog/links.yaml
+  tags:
+    $yaml: catalog/tags.yaml   
+  annotations:
+    # Backstage default annotations  
+    #backstage.io/techdocs-ref: dir:.
+    backstage.io/code-coverage: scm-only
+    backstage.io/kubernetes-id: "ms-vivopay-credit-consent-bms-v1"  
+    backstage.io/kubernetes-namespace: "ccvp"
+    backstage.io/template-origin: template:azure/java-base-cloud-gitflow
+    # Custom Annotations
+    vivo.io/helm-chart-name: "stable/api-microservice"
+    vivo.io/helm-chart-version: "" 
+    vivo.io/system: "core-crédito-vivo-pay"
+    # Governance App
+    techarch.governance-app.application: "core-crédito-vivo-pay"
+    techarch.governance-app.module: "default"
+    techarch.governance-app.technical_component_type: "ms"
+    techarch.governance-app.technical_component_intrastructure_type: "cloud"
+    techarch.governance-app.provider: "n/a"
+    techarch.governance-app.acronym: "ccvp"
+    techarch.governance-app.ic: "tlv_si_core crédito vivo pay"
+    techarch.governance-app.uuid: "1d255c39-5dd9-11f1-8e87-7698aeaf3e2c"
+    # Kubernetes
+    vivo.io/kubernetes-k8s-namespace-dev: "default"
+    vivo.io/kubernetes-k8s-namespace-hml: "default"
+    vivo.io/kubernetes-k8s-namespace-prd: "default"
+    # Azure DevOps Plugin
+    dev.azure.com/project-repo: "CCVP - CORE CRÉDITO VIVO PAY/ms-vivopay-credit-consent-bms-v1"
+    dev.azure.com/project: "CCVP - CORE CRÉDITO VIVO PAY"
+    dev.azure.com/repo: "ms-vivopay-credit-consent-bms-v1"
+    dev.azure.com/organization: "telefonica-vivo-brasil"
+    # Sonarqube Plugin
+    sonarqube.org/project-key: "vivopay-credit-consent-bmsc46c3a69-1feb-45a2-94ad-7e559c88f682"
+    # Arquitetura
+    arqtech.telefonica.com.br/architecture: 'code'
+    # Framework
+    arqtech.telefonica.com.br/framework: spring
+    arqtech.telefonica.com.br/framework-version: '3.0.4'
+    arqtech.telefonica.com.br/architecture: vexa
+    # Language
+    tech.kode3/stack: java
+    arqtech.telefonica.com.br/language: java
+    arqtech.telefonica.com.br/language-version: '21'
+spec:
+  type: service
+  lifecycle: experimental   
+  owner: "CCVP"
+  system: "core-crédito-vivo-pay"
+

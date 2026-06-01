@@ -1,0 +1,60 @@
+server:
+  port: 8082
+
+tlf:
+  logging:
+    enabled: true
+    disable-json-format-in-console: true
+    
+spring:
+  application:
+    name: core-architecture-ri
+  datasource:
+    url: jdbc:h2:mem:AZ;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driverClassName: org.h2.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+  # Habilitando o console para execução de consultas.
+  # Acessar http://localhost:8080/h2-console
+  h2:
+    console:
+      enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: https://autenticainthml.redecorp.br/vivooauth2/security # URI do JWKS do OAM de homologação!
+          jws-algorithms:
+            - RS512
+
+
+springdoc:
+  #version: '@project.version@'
+  swagger-ui:
+    use-root-path: true
+    
+eureka:
+  client:
+    enabled: false
+
+lib-security:
+  enabled: false
+  white-list:
+    - path: "/persons/**"
+      methods: "POST"
+    - path: "/health"
+      methods: "GET"
+    - path: "/swagger/**"
+      methods: "all"
+  environments:
+    esteira: "Local"
+
+
+crypto:
+  enabled: false
+  secret:
+    key: vORmLYFed8BqC6f5mDIVkQ==     
+       
+    
