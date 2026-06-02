@@ -44,7 +44,7 @@ ingress:
       grpc_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
   hosts:
     # Change to ingress domain EX: msv01.redecorp.br
-    - host: dev-ms-vivopay-credit-consent-bms-v1.change.me
+    - host: ms-vivopay-credit-consent-bms-v1.private.pixparcel
       paths: 
       - "/"
   tls: []

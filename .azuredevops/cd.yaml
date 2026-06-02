@@ -1,0 +1,30 @@
+name: deploy
+
+pr: none
+trigger: none
+
+resources:
+  repositories:
+    - repository: CodePlay
+      name: DevOps/Vivo.CodePlay.Pipelines
+      type: git
+      ref: refs/heads/feature/fintech/stable
+      endpoint: CodePlay
+
+  pipelines:
+    - pipeline: ms-vivopay-credit-consent-bms-v1-build
+      source: ms-vivopay-credit-consent-bms-v1-build
+      trigger:
+        branches:
+          include:
+            - main
+            - master
+            - develop
+            - homolog
+
+extends:
+  template: /tech_products/fintech/pipeline/cd/deploy-helm/vvpp.yaml@CodePlay 
+  parameters:
+    variableGroupName: ms-vivopay-credit-consent-bms-v1
+    helmChartName: generic-java-microservice
+    helmChartVersion: 1.0.30

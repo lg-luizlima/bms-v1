@@ -1,0 +1,39 @@
+name: build
+trigger:
+  branches:
+    include:
+    - master
+    - main
+    - develop
+    - homolog
+  paths:
+    include:
+    - '*'
+    exclude:
+    - .azuredevops/*
+    - docs/*
+    - catalog-info.yaml
+    - .dockerignore
+
+pr: none
+
+resources:
+  repositories:
+  - repository: CodePlay
+    name: DevOps/Vivo.CodePlay.Pipelines
+    type: git
+    ref: refs/heads/master
+    endpoint: CodePlay
+
+extends:
+  template: /framework/pipelines/ci/build-java-docker/pipeline.yaml@CodePlay
+  parameters:
+    useMavenCustomSettings: true
+    mavenCustomSettings: ".azuredevops/settings.xml"
+    useNexusToAuth: true
+    registryServiceConnection: "ACR-DEVOPS"
+    branchingStrategy: gitlabflow
+    runQualityGate: false
+    enableCache: false
+    enableTest: false
+    convisoCompany: 639
