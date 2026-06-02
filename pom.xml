@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
 		<groupId>br.com.tlf.adcp</groupId>
 		<artifactId>lib-starter-parent</artifactId>
-		<version>2.2.25</version>
+		<version>2.2.23</version>
 	</parent>
 
 	<artifactId>ms-vivopay-credit-consent-bms-v1</artifactId>
@@ -22,8 +22,10 @@
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
 		<sonar.exclusions>
-		**/contracts/**, **/package-info.*, **/TLFApplication.*
+			**/contracts/**, **/package-info.*, **/TLFApplication.*
 		</sonar.exclusions>
+		<mapstruct.version>1.5.3.Final</mapstruct.version>
+		<lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
 	</properties>
 
 	<dependencies>
@@ -78,17 +80,6 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-jpa</artifactId>
-		</dependency>
-
-		<dependency>
-			<groupId>com.h2database</groupId>
-			<artifactId>h2</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-
-		<dependency>
 			<groupId>org.modelmapper</groupId>
 			<artifactId>modelmapper</artifactId>
 		</dependency>
@@ -113,21 +104,27 @@
 
 		<dependency>
 			<groupId>br.com.tlf.adcp</groupId>
-			<artifactId>lib-java-spring-exception-handling</artifactId>
-			<version>2.3.11</version>
+			<artifactId>lib-spring-exception-handling</artifactId>
+			<version>2.2.2</version>
 		</dependency>
 
 		<dependency>
-			<groupId>br.com.tlf.adcp.commondomain</groupId>
-			<artifactId>lib-starter-logging-v2</artifactId>
-			<version>2.3.12</version>
+			<groupId>br.com.tlf.vvpp</groupId>
+			<artifactId>lib-fintech-log</artifactId>
+			<version>1.0.21</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.auth0</groupId>
+			<artifactId>java-jwt</artifactId>
+			<version>4.4.0</version>
 		</dependency>
 
 		<!--Para ver a doc dessa biblioteca acesse https://wikicorp.telefonica.com.br/pages/viewpage.action?pageId=561737016 -->
 		<dependency>
 			<groupId>br.com.tlf.adcp</groupId>
-			<artifactId>lib-java-spring-cloud-abstraction</artifactId>
-			<version>2.2.10</version>
+			<artifactId>lib-java-cloud-abstract-layer</artifactId>
+			<version>2.1.2</version>
 		</dependency>
 
 		<!-- SERVICE DISCOVERY -->
@@ -143,20 +140,78 @@
 
 		<dependency>
 			<groupId>br.com.tlf.adcp</groupId>
-			<artifactId>lib-java-spring-security</artifactId>
-			<version>3.7.1</version>
+			<artifactId>lib-java-spring-security-starter</artifactId>
+			<version>3.4.1</version>
 		</dependency>
 
 		<dependency>
 			<groupId>br.com.tlf.adcp</groupId>
 			<artifactId>lib-java-spring-shared-common</artifactId>
-			<version>2.2.12</version>
+			<version>2.1.2</version>
 		</dependency>
 
 		<dependency>
 			<groupId>br.com.tlf.adcp.crypto</groupId>
-			<artifactId>lib-java-spring-crypto-management</artifactId>
-			<version>2.2.9</version>
+			<artifactId>lib-crypto-management</artifactId>
+			<version>2.1.1</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
+		</dependency>
+
+		<!-- PostgreSQL / JPA -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!-- Redis -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.mapstruct</groupId>
+			<artifactId>mapstruct</artifactId>
+			<version>${mapstruct.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.mapstruct</groupId>
+			<artifactId>mapstruct-processor</artifactId>
+			<version>${mapstruct.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok-mapstruct-binding</artifactId>
+			<version>${lombok-mapstruct-binding.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+			<version>0.11.5</version>
+		</dependency>
+
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+			<version>0.11.5</version>
+		</dependency>
+
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-jackson</artifactId>
+			<version>0.11.5</version>
 		</dependency>
 
 	</dependencies>
@@ -168,6 +223,29 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</path>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok-mapstruct-binding</artifactId>
+							<version>${lombok-mapstruct-binding.version}</version>
+						</path>
+						<path>
+							<groupId>org.mapstruct</groupId>
+							<artifactId>mapstruct-processor</artifactId>
+							<version>${mapstruct.version}</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
 		</plugins>
+		<finalName>${project.artifactId}</finalName>
 	</build>
 </project>
