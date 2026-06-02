@@ -43,7 +43,7 @@ ingress:
       proxy_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
       grpc_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
   hosts:
-    - host: prd-ms-vivopay-credit-consent-bms-v1.change.me
+    - host: ms-vivopay-credit-consent-bms-v1.private.prod
       paths: 
       - "/"
   tls: []

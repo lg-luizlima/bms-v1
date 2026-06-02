@@ -1,0 +1,75 @@
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                              https://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+
+  <profiles>
+    <profile>
+      <id>devops</id>
+
+      <repositories>
+
+        <!-- Azure DevOps -->
+        <repository>
+          <id>DevOps</id>
+          <url>https://pkgs.dev.azure.com/telefonica-vivo-brasil/_packaging/DevOps/maven/v1</url>
+          <releases>
+            <enabled>true</enabled>
+          </releases>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+        </repository>
+
+        <!-- Nexus common-domain -->
+        <repository>
+          <id>common-domain</id>
+          <name>common-domain</name>
+          <url>https://nexus.telefonica.com.br/repository/common-domain-mvn/</url>
+          <releases>
+            <enabled>true</enabled>
+          </releases>
+          <snapshots>
+            <enabled>true</enabled>
+            <updatePolicy>always</updatePolicy>
+          </snapshots>
+        </repository>
+
+        <!-- Maven Central (fallback) -->
+        <repository>
+          <id>central</id>
+          <url>https://repo.maven.apache.org/maven2</url>
+          <releases>
+            <enabled>true</enabled>
+          </releases>
+          <snapshots>
+            <enabled>false</enabled>
+          </snapshots>
+        </repository>
+
+      </repositories>
+    </profile>
+  </profiles>
+
+
+  <activeProfiles>
+    <activeProfile>devops</activeProfile>
+  </activeProfiles>
+
+  <servers>
+    <server>
+      <id>DevOps</id>
+      <username>AzureDevOps</username>
+      <password>${AZURE_DEVOPS_PAT}</password>
+    </server>
+    
+    <server>
+      <id>common-domain</id>
+      <username>${NEXUS_DEPS_USR}</username>
+      <password>${NEXUS_DEPS_PSW}</password>
+    </server>
+
+  </servers>
+
+</settings>
