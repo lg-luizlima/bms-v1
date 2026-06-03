@@ -5,9 +5,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import br.com.tlf.domain.vo.terms.ActiveConsentResponseVO;
-import br.com.tlf.domain.vo.terms.ProductTypeEnum;
-import br.com.tlf.domain.vo.terms.TermsCatalogVO;
+import br.com.tlf.core.domain.vo.terms.ActiveConsentResponseVO;
+import br.com.tlf.core.domain.vo.terms.ProductTypeEnum;
+import br.com.tlf.core.domain.vo.terms.TermsCatalogVO;
 
 public class CreditTermDummies {
 
