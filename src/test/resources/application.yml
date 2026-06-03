@@ -5,7 +5,8 @@ tlf:
   logging:
     enabled: true
     disable-json-format-in-console: true
-    
+  lending: {}
+
 spring:
   application:
     name: core-architecture-ri
@@ -16,6 +17,12 @@ spring:
     driverClassName: org.h2.Driver
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
   # Habilitando o console para execução de consultas.
   # Acessar http://localhost:8080/h2-console
   h2:
