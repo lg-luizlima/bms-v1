@@ -1,10 +1,10 @@
-package br.com.tlf.core.application;
+package br.com.tlf.shared.constants;
 
-import lombok.experimental.UtilityClass;
-
-@UtilityClass
 public class ApplicationConstants {
 
+    private ApplicationConstants() {}
+
+    public static final String APPLICATION_NAME = "CREDIT_CORE_CONSENT_BMS";
     public static final String CLASS_METHOD_MESSAGE_PATTERN = "Class {}, method {}";
     public static final int DEFAULT_CODECS_SIZE = 16 * 1024 * 1024;
     public static final Long MAX_VALIDITY_DAYS = 30L;
