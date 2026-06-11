@@ -1,4 +1,4 @@
-package br.com.tlf.infrastructure.persistence.postgresql.custom.catalog;
+package br.com.tlf.core.port.out.termscatalog;
 
 import java.util.List;
 

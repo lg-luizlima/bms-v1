@@ -8,6 +8,7 @@ import org.springframework.validation.annotation.Validated;
 
 import br.com.tlf.infrastructure.persistence.postgresql.entity.TermsCatalogEntity;
 import br.com.tlf.core.domain.vo.terms.TermsCatalogVO;
+import br.com.tlf.core.port.out.termscatalog.TermsCatalogRepository;
 import br.com.tlf.infrastructure.persistence.postgresql.jpa.TermsCatalogJpaRepository;
 import br.com.tlf.infrastructure.persistence.postgresql.mapper.TermsCatalogRepositoryMapper;
 import lombok.RequiredArgsConstructor;

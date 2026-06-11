@@ -20,15 +20,12 @@ import br.com.tlf.core.port.in.dto.response.ActiveConsentResponseDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-
 @Slf4j
 @Validated
 @RequiredArgsConstructor
 @RestController
 @RequestMapping(UrlConstant.CREDIT_CORE_URL_BASE)
-public class CreditCoreController  {
-
-    private static final String CONTROLLER_CONTEXT = "[Lending Core Controller]";
+public class CreditCoreController {
 
     private final CreditCorePortIn creditCoreService;
     private final Assembler assembler;
@@ -36,22 +33,15 @@ public class CreditCoreController  {
     @GetMapping(UrlConstant.TERMS_URI)
     @ResponseStatus(HttpStatus.OK)
     public ResponseDTO getActiveConsents(@RequestHeader String authorization,
-                                                                           @RequestParam String product) {
-        log.info("{} Incoming get active consents request for product: {}", CONTROLLER_CONTEXT, product);
-
-            ActiveConsentResponseDTO response = creditCoreService.getPendingTerms(authorization, product);
-            log.info("{} Active consents retrieved successfully", CONTROLLER_CONTEXT);
-            return assembler.toResponseDTO(response, "ok", "Active consents retrieved successfully");
+            @RequestParam String product) {
+        return assembler.toResponseDTO(creditCoreService.getPendingTerms(authorization, product), "ok",
+                "Active consents retrieved successfully");
 
     }
 
     @PostMapping(UrlConstant.CONSENTS_URI)
     @ResponseStatus(HttpStatus.CREATED)
     public void createConsent(@RequestHeader String authorization, @RequestBody ConsentRequestDTO request) {
-        log.info(CONTROLLER_CONTEXT + " Incoming consent request for product: {}", request.getProduct());
-        log.info(CONTROLLER_CONTEXT + " Number of accepted terms: {}", request.getAcceptedTerms().size());
-
-            creditCoreService.createConsent(authorization, request);
-            log.info(CONTROLLER_CONTEXT + " Consent request processed successfully");
+        creditCoreService.createConsent(authorization, request);
     }
 }

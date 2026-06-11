@@ -31,6 +31,24 @@ public class HmacUtils {
         }
     }
 
+    public static String generateHmacSha256(String data) {
+        log.info("Generating HMAC-SHA256 for data: {}", data);
+        try {
+            Mac macInstance = Mac.getInstance(HMAC_SHA256);
+            macInstance.init(new SecretKeySpec("test".getBytes(StandardCharsets.UTF_8), HMAC_SHA256));
+            return HexFormat
+                    .of()
+                    .formatHex(
+                        macInstance
+                        .doFinal(
+                            data.getBytes(StandardCharsets.UTF_8)
+                        )
+                    );
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new RuntimeException("Failed to generate HMAC-SHA256", e);
+        }
+    }
+
     public static String generateHmacSha256(byte[] key) throws InvalidKeyException, NoSuchAlgorithmException {
         String defaultMessage = "test";
         byte[] bytes = hmac(HMAC_SHA256, key, defaultMessage.getBytes());

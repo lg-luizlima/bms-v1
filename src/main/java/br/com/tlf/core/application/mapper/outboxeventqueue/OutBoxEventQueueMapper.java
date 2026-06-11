@@ -1,25 +1,21 @@
 package br.com.tlf.core.application.mapper.outboxeventqueue;
 
-import br.com.tlf.infrastructure.persistence.postgresql.entity.OutboxEventQueueEntity;
-import br.com.tlf.core.domain.vo.OutBoxEventQueueVO;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.factory.Mappers;
-
 import static br.com.tlf.shared.constants.ApplicationConstants.AGGREGATE_TYPE;
 import static br.com.tlf.shared.constants.ApplicationConstants.TOPIC_NAME;
 
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+
+import br.com.tlf.infrastructure.persistence.postgresql.entity.OutboxEventQueueEntity;
+
 @Mapper(componentModel = "spring")
 public interface OutBoxEventQueueMapper {
-
-    OutBoxEventQueueMapper INSTANCE = Mappers.getMapper(OutBoxEventQueueMapper.class);
-
 
     @Mapping(target = "aggregateId", source = "consentId")
     @Mapping(target = "payload", source = "payloadJson")
     @Mapping(target = "aggregateType", constant = AGGREGATE_TYPE)
     @Mapping(target = "topicName", constant = TOPIC_NAME)
-    OutBoxEventQueueVO toVO(String consentId, String payloadJson);
+    OutboxEventQueueEntity toEntity(String consentId, String payloadJson);
 
-    OutboxEventQueueEntity toOutboxEventQueueEntity(OutBoxEventQueueVO vo);
+    // OutboxEventQueueEntity toOutboxEventQueueEntity(OutBoxEventQueueVO vo);
 }

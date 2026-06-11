@@ -1,8 +1,8 @@
 package br.com.tlf.core.domain.vo.terms;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.UUID;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

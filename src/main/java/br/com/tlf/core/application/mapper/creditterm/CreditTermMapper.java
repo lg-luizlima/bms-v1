@@ -13,7 +13,7 @@ public interface CreditTermMapper {
 
     CreditTermMapper INSTANCE = Mappers.getMapper(CreditTermMapper.class);
 
-    @Mapping(source = "id",          target = "termId")
+    @Mapping(source = "id", target = "termId")
     List<PendingTermVO> toPendingTermVO(List<TermsCatalogVO> catalog);
 
 }

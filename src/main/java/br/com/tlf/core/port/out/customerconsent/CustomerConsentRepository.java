@@ -1,4 +1,4 @@
-package br.com.tlf.infrastructure.persistence.postgresql.custom.consent;
+package br.com.tlf.core.port.out.customerconsent;
 
 
 import br.com.tlf.core.domain.vo.terms.CustomerConsentVO;

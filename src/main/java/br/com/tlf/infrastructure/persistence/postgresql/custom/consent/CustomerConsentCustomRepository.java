@@ -2,6 +2,7 @@ package br.com.tlf.infrastructure.persistence.postgresql.custom.consent;
 
 import br.com.tlf.infrastructure.persistence.postgresql.entity.CustomerConsentEntity;
 import br.com.tlf.core.domain.vo.terms.CustomerConsentVO;
+import br.com.tlf.core.port.out.customerconsent.CustomerConsentRepository;
 import br.com.tlf.infrastructure.persistence.postgresql.jpa.CustomerConsentJpaRepository;
 import br.com.tlf.infrastructure.persistence.postgresql.mapper.CustomerConsentRepositoryMapper;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import java.util.UUID;
 public class CustomerConsentCustomRepository implements CustomerConsentRepository {
 
     private final CustomerConsentJpaRepository customerConsentJpaRepository;
+    private final CustomerConsentRepositoryMapper customerConsentRepositoryMapper;
 
 
     @Override
@@ -47,7 +49,7 @@ public class CustomerConsentCustomRepository implements CustomerConsentRepositor
     public void saveConsent(CustomerConsentVO consentVO) {
         log.info("Persisting consent for consentVO: {}", consentVO);
 
-        CustomerConsentEntity entity = CustomerConsentRepositoryMapper.INSTANCE.toEntity(consentVO);
+        CustomerConsentEntity entity = customerConsentRepositoryMapper.toEntity(consentVO);
 
         customerConsentJpaRepository.save(entity);
         log.info("Consent saved successfully");
