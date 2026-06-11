@@ -2,8 +2,9 @@ package br.com.tlf.core.application.mapper.creditcore;
 
 import br.com.tlf.core.domain.vo.consent.ConsentRequestVO;
 import br.com.tlf.core.domain.vo.terms.ActiveConsentResponseVO;
-import br.com.tlf.api.rest.dto.request.consent.ConsentRequestDTO;
-import br.com.tlf.api.rest.dto.response.consent.ActiveConsentResponseDTO;
+import br.com.tlf.core.port.in.dto.request.ConsentRequestDTO;
+import br.com.tlf.core.port.in.dto.response.ActiveConsentResponseDTO;
+
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;

@@ -1,7 +1,8 @@
 package br.com.tlf.api.rest.assembler;
 
-import br.com.tlf.api.rest.dto.response.ResponseDTO;
 import org.springframework.stereotype.Component;
+
+import br.com.tlf.api.rest.shared.ResponseDTO;
 
 @Component
 public class Assembler {

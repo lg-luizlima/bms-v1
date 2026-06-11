@@ -1,12 +1,11 @@
 package br.com.tlf.core.application.service.creditcore;
 
+import br.com.tlf.api.rest.config.exceptionhandler.error.InvalidTermException;
+import br.com.tlf.api.rest.config.exceptionhandler.model.ConsentErrorEntry;
 import br.com.tlf.core.application.mapper.creditcore.CreditCoreMapper;
 import br.com.tlf.core.application.mapper.creditterm.CreditTermMapper;
 import br.com.tlf.core.application.mapper.outboxeventqueue.OutBoxEventQueueMapper;
-import br.com.tlf.core.domain.service.creditcore.CreditCoreService;
 import br.com.tlf.core.domain.service.outbox.OutboxEventQueueService;
-import br.com.tlf.shared.configuration.common.rest.exceptionhandler.error.InvalidTermException;
-import br.com.tlf.shared.configuration.common.rest.exceptionhandler.model.ConsentErrorEntry;
 import br.com.tlf.shared.util.JwtTokenUtils;
 import br.com.tlf.core.domain.vo.OutBoxEventQueueVO;
 import br.com.tlf.core.domain.vo.consent.AcceptedTermVO;
@@ -14,8 +13,9 @@ import br.com.tlf.core.domain.vo.consent.ConsentRequestVO;
 import br.com.tlf.core.domain.vo.terms.ActiveConsentResponseVO;
 import br.com.tlf.core.domain.vo.terms.CustomerConsentVO;
 import br.com.tlf.core.domain.vo.terms.TermsCatalogVO;
-import br.com.tlf.api.rest.dto.request.consent.ConsentRequestDTO;
-import br.com.tlf.api.rest.dto.response.consent.ActiveConsentResponseDTO;
+import br.com.tlf.core.port.in.creditcore.CreditCorePortIn;
+import br.com.tlf.core.port.in.dto.request.ConsentRequestDTO;
+import br.com.tlf.core.port.in.dto.response.ActiveConsentResponseDTO;
 import br.com.tlf.infrastructure.persistence.postgresql.custom.catalog.TermsCatalogRepository;
 import br.com.tlf.infrastructure.persistence.postgresql.custom.consent.CustomerConsentRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -38,12 +38,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import static br.com.tlf.core.application.ApplicationConstants.MAX_VALIDITY_DAYS;
+import static br.com.tlf.shared.constants.ApplicationConstants.MAX_VALIDITY_DAYS;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class CreditCoreServiceImpl implements CreditCoreService {
+public class CreditCoreServiceImpl implements CreditCorePortIn {
 
     private final CustomerConsentRepository customerConsentRepository;
     private final TermsCatalogRepository termsCatalogRepository;

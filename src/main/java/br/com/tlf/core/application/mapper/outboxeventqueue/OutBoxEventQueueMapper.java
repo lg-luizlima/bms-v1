@@ -6,8 +6,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;
 
-import static br.com.tlf.core.application.ApplicationConstants.AGGREGATE_TYPE;
-import static br.com.tlf.core.application.ApplicationConstants.TOPIC_NAME;
+import static br.com.tlf.shared.constants.ApplicationConstants.AGGREGATE_TYPE;
+import static br.com.tlf.shared.constants.ApplicationConstants.TOPIC_NAME;
 
 @Mapper(componentModel = "spring")
 public interface OutBoxEventQueueMapper {
