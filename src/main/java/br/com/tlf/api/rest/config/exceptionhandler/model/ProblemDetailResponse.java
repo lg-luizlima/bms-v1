@@ -20,5 +20,5 @@ public class ProblemDetailResponse {
     private String details;
     private String timestamp;
     private String traceId;
-    private List<ConsentErrorEntry> errors;
+    private List<String> errors;
 }

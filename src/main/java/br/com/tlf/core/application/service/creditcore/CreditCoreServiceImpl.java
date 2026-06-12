@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import br.com.tlf.core.application.mapper.creditcore.CreditCoreMapper;
 import br.com.tlf.core.application.mapper.outboxeventqueue.OutBoxEventQueueMapper;
+import br.com.tlf.core.domain.exception.MandatoryTermNotAcceptedException;
 import br.com.tlf.core.domain.vo.consent.ConsentRequestVO;
 import br.com.tlf.core.domain.vo.terms.ActiveConsentResponseVO;
 import br.com.tlf.core.domain.vo.terms.CustomerConsentVO;
@@ -46,7 +47,6 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
     private final StringRedisTemplate redisTemplate;
 
     @Override
-    @Transactional
     public void createConsent(String authorization, ConsentRequestDTO requestDTO) {
 
         String cpfHash = HmacUtils.generateHmacSha256(JwtTokenUtils.cpfToken(authorization));
@@ -54,51 +54,23 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         ConsentRequestVO consentRequestVO = creditCoreMapper.toVO(requestDTO, cpfHash);
 
         Map<String, TermsCatalogVO> termMap = termsCatalogRepository
-                                                .findLatestActiveByProduct(requestDTO.getProduct()).stream()
-                                                .collect(
-                                                    Collectors.toMap(TermsCatalogVO::getTermCode, t -> t)
-                                                );
+                .findLatestActiveByProduct(requestDTO.getProduct())
+                .stream()
+                .collect(
+                        Collectors.toMap(TermsCatalogVO::getTermCode, t -> t)
+                );
 
-        consentRequestVO
-            .getAcceptedTerms()
-            .stream()
-            .forEach(acceptedTerm -> {
-                if (!customerConsentRepository.getActiveConsent(cpfHash, acceptedTerm.getTermCode()))
-                    saveConsent(
-                        creditCoreMapper
-                        .toCustomerConsentVO(
-                            cpfHash
-                            , consentRequestVO
-                            , acceptedTerm
-                            , termMap.get(acceptedTerm.getTermCode())
-                        )
-                    );
-            });
+        List<TermsCatalogVO> notAcceptedMandatoryTerms = getNotAcceptedMandatoryTerms(consentRequestVO, termMap);
+        if(!notAcceptedMandatoryTerms.isEmpty()) 
+            throw new MandatoryTermNotAcceptedException("Mandatory terms not accepted.", createErrorsList(notAcceptedMandatoryTerms));
+        processAcceptedTerms(cpfHash, consentRequestVO, termMap);
 
-        redisTemplate
-        .opsForValue()
-        .set(
-            "sync_status:" + consentRequestVO.getCpf()
-            , "PROCESSING"
-            , MAX_VALIDITY_DAYS
-            , TimeUnit.DAYS
-        );
-
-    }
-
-    @Transactional
-    private void saveConsent(CustomerConsentVO consent) {
-        customerConsentRepository.saveConsent(consent);
-        OutboxEventQueueEntity outboxEvent = outBoxEventQueueMapper.toEntity(
-                consent.getId().toString(), toJson(consent));
-        outboxEventQueueRepository.save(outboxEvent);
     }
 
     @Override
     public ActiveConsentResponseDTO getPendingTerms(String authorization, String product) {
 
         String cpfHash = HmacUtils.generateHmacSha256(JwtTokenUtils.cpfToken(authorization));
-        log.info("CPF hash computed successfully");
 
         List<TermsCatalogVO> termsCatalog = termsCatalogRepository.findLatestActiveByProduct(product);
 
@@ -125,6 +97,49 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
 
         return creditCoreMapper.toActiveConsentResponseDTO(build);
     }
+
+    private List<String> createErrorsList(List<TermsCatalogVO> notAcceptedMandatoryTerms) {
+        return notAcceptedMandatoryTerms.stream().map(term-> "Term " + term.getTermCode() + " is mandatory and must be accepted.").toList();
+    }
+
+    private List<TermsCatalogVO> getNotAcceptedMandatoryTerms(ConsentRequestVO consentRequestVO,
+            Map<String, TermsCatalogVO> termMap) {
+        return termMap.values().stream()
+                .filter(TermsCatalogVO::getIsMandatory)
+                .filter(t -> consentRequestVO.getAcceptedTerms().stream()
+                        .noneMatch(at -> at.getTermCode().equals(t.getTermCode())))
+                .toList();
+    }
+
+    private void processAcceptedTerms(String cpfHash, ConsentRequestVO consentRequestVO,
+            Map<String, TermsCatalogVO> termMap) {
+        consentRequestVO
+                .getAcceptedTerms()
+                .stream()
+                .forEach(acceptedTerm -> {
+                    if (!customerConsentRepository.getActiveConsent(cpfHash, acceptedTerm.getTermCode()))
+                        saveConsent(
+                                creditCoreMapper
+                                        .toCustomerConsentVO(
+                                                cpfHash, consentRequestVO, acceptedTerm,
+                                                termMap.get(acceptedTerm.getTermCode())));
+                });
+
+        redisTemplate
+                .opsForValue()
+                .set(
+                        "sync_status:" + consentRequestVO.getCpf(), "PROCESSING", MAX_VALIDITY_DAYS, TimeUnit.DAYS);
+    }
+
+    @Transactional
+    private void saveConsent(CustomerConsentVO consent) {
+        customerConsentRepository.saveConsent(consent);
+        OutboxEventQueueEntity outboxEvent = outBoxEventQueueMapper.toEntity(
+                consent.getId().toString(), toJson(consent));
+        outboxEventQueueRepository.save(outboxEvent);
+    }
+
+    
 
     private String toJson(Object value) {
         try {

@@ -7,13 +7,13 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class ConsentErrorEntry {
+public class ErrorEntry {
 
     private String code;
     private String field;
     private String message;
 
-    public ConsentErrorEntry(String code, String message) {
+    public ErrorEntry(String code, String message) {
         this.code = code;
         this.message = message;
     }
