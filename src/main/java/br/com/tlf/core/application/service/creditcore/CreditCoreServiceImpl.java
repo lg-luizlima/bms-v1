@@ -29,7 +29,7 @@ import br.com.tlf.core.port.out.termscatalog.TermsCatalogRepository;
 import br.com.tlf.infrastructure.persistence.postgresql.entity.OutboxEventQueueEntity;
 import br.com.tlf.infrastructure.persistence.postgresql.jpa.OutboxEventQueueJpaRepository;
 import br.com.tlf.shared.util.HmacUtils;
-import br.com.tlf.shared.util.JwtTokenUtils;
+import br.com.tlf.shared.util.jwt.JwtTokenUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
