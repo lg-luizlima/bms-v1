@@ -1,4 +1,4 @@
-package br.com.tlf.shared.util;
+package br.com.tlf.shared.util.jwt;
 
 
 import com.auth0.jwt.JWT;
@@ -7,8 +7,9 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import br.com.tlf.api.rest.config.exceptionhandler.error.InvalidTokenException;
-import br.com.tlf.api.rest.config.exceptionhandler.error.TokenNullException;
+import br.com.tlf.shared.util.HmacUtils;
+import br.com.tlf.shared.util.jwt.exception.InvalidTokenException;
+import br.com.tlf.shared.util.jwt.exception.TokenNullException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;

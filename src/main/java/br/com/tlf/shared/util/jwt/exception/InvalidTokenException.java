@@ -1,4 +1,4 @@
-package br.com.tlf.api.rest.config.exceptionhandler.error;
+package br.com.tlf.shared.util.jwt.exception;
 
 public class InvalidTokenException extends RuntimeException {
 
