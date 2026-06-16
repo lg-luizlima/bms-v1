@@ -6,15 +6,15 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
-import br.com.tlf.infrastructure.persistence.postgresql.entity.TermsCatalogEntity;
+import br.com.tlf.infrastructure.persistence.postgresql.entity.TermsCatalogJpaEntity;
 
-public interface TermsCatalogJpaRepository extends JpaRepository<TermsCatalogEntity, UUID> {
+public interface TermsCatalogJpaRepository extends JpaRepository<TermsCatalogJpaEntity, UUID> {
 
     @Query("""
-        SELECT t FROM TermsCatalogEntity t
+        SELECT t FROM TermsCatalogJpaEntity t
         WHERE t.product = :product
           AND t.startAt <= CURRENT_DATE
           AND (t.endAt IS NULL OR t.endAt >= CURRENT_DATE)
     """)
-    List<TermsCatalogEntity> findLatestActiveByProduct(String product);
+    List<TermsCatalogJpaEntity> findLatestActiveByProduct(String product);
 }

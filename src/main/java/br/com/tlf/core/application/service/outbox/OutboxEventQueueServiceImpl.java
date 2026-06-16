@@ -1,7 +1,7 @@
 package br.com.tlf.core.application.service.outbox;
 
 import br.com.tlf.core.application.mapper.outboxeventqueue.OutBoxEventQueueMapper;
-import br.com.tlf.infrastructure.persistence.postgresql.entity.OutboxEventQueueEntity;
+import br.com.tlf.infrastructure.persistence.postgresql.entity.OutboxEventQueueJpaEntity;
 import br.com.tlf.infrastructure.persistence.postgresql.jpa.OutboxEventQueueJpaRepository;
 import br.com.tlf.core.domain.service.outbox.OutboxEventQueueService;
 import br.com.tlf.core.domain.vo.OutBoxEventQueueVO;

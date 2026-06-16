@@ -20,7 +20,7 @@ import java.util.UUID;
 
 @Entity
 @Table(
-    name = "customer_consent",
+    name = "tb_customer_consents",
     indexes = {
         @Index(name = "idx_customer_consent_cpf_hash", columnList = "cpf_hash"),
         @Index(name = "idx_customer_consent_expires_at", columnList = "expires_at")
@@ -31,7 +31,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CustomerConsentEntity {
+public class CustomerConsentJpaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

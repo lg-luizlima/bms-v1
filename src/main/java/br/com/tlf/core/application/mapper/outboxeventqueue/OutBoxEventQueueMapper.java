@@ -6,7 +6,7 @@ import static br.com.tlf.shared.constants.ApplicationConstants.TOPIC_NAME;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-import br.com.tlf.infrastructure.persistence.postgresql.entity.OutboxEventQueueEntity;
+import br.com.tlf.infrastructure.persistence.postgresql.entity.OutboxEventQueueJpaEntity;
 
 @Mapper(componentModel = "spring")
 public interface OutBoxEventQueueMapper {
@@ -15,7 +15,7 @@ public interface OutBoxEventQueueMapper {
     @Mapping(target = "payload", source = "payloadJson")
     @Mapping(target = "aggregateType", constant = AGGREGATE_TYPE)
     @Mapping(target = "topicName", constant = TOPIC_NAME)
-    OutboxEventQueueEntity toEntity(String consentId, String payloadJson);
+    OutboxEventQueueJpaEntity toEntity(String consentId, String payloadJson);
 
     // OutboxEventQueueEntity toOutboxEventQueueEntity(OutBoxEventQueueVO vo);
 }

@@ -13,10 +13,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "terms_catalog")
+@Table(name = "tb_terms")
 @Getter
 @NoArgsConstructor
-public class TermsCatalogEntity {
+public class TermsCatalogJpaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

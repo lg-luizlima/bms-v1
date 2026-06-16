@@ -1,18 +1,16 @@
 package br.com.tlf.infrastructure.persistence.postgresql.custom.consent;
 
-import br.com.tlf.infrastructure.persistence.postgresql.entity.CustomerConsentEntity;
-import br.com.tlf.core.domain.vo.terms.CustomerConsentVO;
-import br.com.tlf.core.port.out.customerconsent.CustomerConsentRepository;
-import br.com.tlf.infrastructure.persistence.postgresql.jpa.CustomerConsentJpaRepository;
-import br.com.tlf.infrastructure.persistence.postgresql.mapper.CustomerConsentRepositoryMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 import org.springframework.validation.annotation.Validated;
 
-import java.util.Optional;
-import java.util.UUID;
+import br.com.tlf.core.domain.vo.terms.CustomerConsentVO;
+import br.com.tlf.core.port.out.customerconsent.CustomerConsentRepository;
+import br.com.tlf.infrastructure.persistence.postgresql.entity.CustomerConsentJpaEntity;
+import br.com.tlf.infrastructure.persistence.postgresql.jpa.CustomerConsentJpaRepository;
+import br.com.tlf.infrastructure.persistence.postgresql.mapper.CustomerConsentRepositoryMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -24,34 +22,24 @@ public class CustomerConsentCustomRepository implements CustomerConsentRepositor
     private final CustomerConsentJpaRepository customerConsentJpaRepository;
     private final CustomerConsentRepositoryMapper customerConsentRepositoryMapper;
 
-
     @Override
-    public Boolean getActiveConsent(String cpfHash, String termCode) {
-        log.info("Checking active consent for cpfHash={}, termCode={}", cpfHash, termCode);
-
-        var consentActive = customerConsentJpaRepository
-                .findActiveByCpfHashAndTermCode(cpfHash, termCode);
-        log.info("Active consent query result present: {}", consentActive.isPresent());
-
-        return consentActive.isPresent();
-    }
-
-    @Override
-    public Optional<UUID> getActiveConsentTermId(String cpfHash, String termCode) {
+    public CustomerConsentVO getActiveCustomerConsent(String cpfHash, String termCode) {
         log.info("Getting active consent termId for cpfHash={}, termCode={}", cpfHash, termCode);
 
         return customerConsentJpaRepository
                 .findActiveByCpfHashAndTermCode(cpfHash, termCode)
-                .map(CustomerConsentEntity::getTermId);
+                .map(customerConsentRepositoryMapper::toVO)
+                .orElse(null);
     }
 
     @Override
-    public void saveConsent(CustomerConsentVO consentVO) {
+    public CustomerConsentVO saveConsent(CustomerConsentVO consentVO) {
         log.info("Persisting consent for consentVO: {}", consentVO);
 
-        CustomerConsentEntity entity = customerConsentRepositoryMapper.toEntity(consentVO);
+        CustomerConsentJpaEntity entity = customerConsentRepositoryMapper.toEntity(consentVO);
 
         customerConsentJpaRepository.save(entity);
-        log.info("Consent saved successfully");
+        CustomerConsentVO savedConsent = customerConsentRepositoryMapper.toVO(entity);
+        return savedConsent;
     }
 }

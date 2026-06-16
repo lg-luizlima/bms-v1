@@ -19,13 +19,13 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "outbox_event_queue")
+@Table(name = "tb_outbox_events")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class OutboxEventQueueEntity {
+public class OutboxEventQueueJpaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
