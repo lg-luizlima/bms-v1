@@ -22,7 +22,6 @@ import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
@@ -51,7 +50,7 @@ import br.com.tlf.core.port.out.termscatalog.TermsCatalogRepository;
 import br.com.tlf.dummies.ConsentRequestDummies;
 import br.com.tlf.dummies.CreditTermDummies;
 import br.com.tlf.dummies.CustomerConsentDummies;
-import br.com.tlf.infrastructure.persistence.postgresql.entity.OutboxEventQueueEntity;
+import br.com.tlf.infrastructure.persistence.postgresql.entity.OutboxEventQueueJpaEntity;
 import br.com.tlf.infrastructure.persistence.postgresql.jpa.OutboxEventQueueJpaRepository;
 import br.com.tlf.shared.util.HmacUtils;
 import br.com.tlf.shared.util.jwt.JwtTokenUtils;
@@ -78,7 +77,7 @@ class CreditCoreServiceImplTest {
         TermsCatalogVO revokedTerm = CreditTermDummies.revokedTerm();
         ConsentRequestVO requestVO = ConsentRequestDummies.consentRequestVO();
         CustomerConsentVO consentVO = CustomerConsentDummies.revokedTermConsent();
-        OutboxEventQueueEntity outboxEntity = mock(OutboxEventQueueEntity.class);
+        OutboxEventQueueJpaEntity outboxEntity = mock(OutboxEventQueueJpaEntity.class);
 
         try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class);
              MockedStatic<HmacUtils> hmacMock = mockStatic(HmacUtils.class)) {
@@ -90,8 +89,8 @@ class CreditCoreServiceImplTest {
                     .thenReturn(requestVO);
             when(termsCatalogRepository.findLatestActiveByProduct(PRODUCT))
                     .thenReturn(List.of(revokedTerm));
-            when(customerConsentRepository.getActiveConsent(CUSTOMER_ID, REVOKED_TERM_CODE))
-                    .thenReturn(false);
+            when(customerConsentRepository.getActiveCustomerConsent(CUSTOMER_ID, REVOKED_TERM_CODE))
+                    .thenReturn(null);
             when(creditCoreMapper.toCustomerConsentVO(
                     eq(CUSTOMER_ID), eq(requestVO),
                     eq(ConsentRequestDummies.acceptedRevokedTermVO()), eq(revokedTerm)))
@@ -153,8 +152,8 @@ class CreditCoreServiceImplTest {
                     .thenReturn(requestVO);
             when(termsCatalogRepository.findLatestActiveByProduct(PRODUCT))
                     .thenReturn(List.of(revokedTerm));
-            when(customerConsentRepository.getActiveConsent(CUSTOMER_ID, REVOKED_TERM_CODE))
-                    .thenReturn(true);
+            when(customerConsentRepository.getActiveCustomerConsent(CUSTOMER_ID, REVOKED_TERM_CODE))
+                    .thenReturn(CustomerConsentDummies.consentWithTermId(REVOKED_TERM_ID, REVOKED_TERM_CODE));
             when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
             underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm());
@@ -180,10 +179,10 @@ class CreditCoreServiceImplTest {
 
             when(termsCatalogRepository.findLatestActiveByProduct(PRODUCT))
                     .thenReturn(List.of(revokedTerm, softTerm));
-            when(customerConsentRepository.getActiveConsentTermId(CUSTOMER_ID, REVOKED_TERM_CODE))
-                    .thenReturn(Optional.of(REVOKED_TERM_ID));
-            when(customerConsentRepository.getActiveConsentTermId(CUSTOMER_ID, SOFT_TERM_CODE))
-                    .thenReturn(Optional.of(SOFT_TERM_ID));
+            when(customerConsentRepository.getActiveCustomerConsent(CUSTOMER_ID, REVOKED_TERM_CODE))
+                    .thenReturn(CustomerConsentDummies.consentWithTermId(REVOKED_TERM_ID, REVOKED_TERM_CODE));
+            when(customerConsentRepository.getActiveCustomerConsent(CUSTOMER_ID, SOFT_TERM_CODE))
+                    .thenReturn(CustomerConsentDummies.consentWithTermId(SOFT_TERM_ID, SOFT_TERM_CODE));
             when(creditCoreMapper.toPendingTermVO(anyList()))
                     .thenReturn(Collections.emptyList());
 
@@ -220,10 +219,10 @@ class CreditCoreServiceImplTest {
 
             when(termsCatalogRepository.findLatestActiveByProduct(PRODUCT))
                     .thenReturn(List.of(revokedTerm, softTerm));
-            when(customerConsentRepository.getActiveConsentTermId(CUSTOMER_ID, REVOKED_TERM_CODE))
-                    .thenReturn(Optional.empty());
-            when(customerConsentRepository.getActiveConsentTermId(CUSTOMER_ID, SOFT_TERM_CODE))
-                    .thenReturn(Optional.of(SOFT_TERM_ID));
+            when(customerConsentRepository.getActiveCustomerConsent(CUSTOMER_ID, REVOKED_TERM_CODE))
+                    .thenReturn(null);
+            when(customerConsentRepository.getActiveCustomerConsent(CUSTOMER_ID, SOFT_TERM_CODE))
+                    .thenReturn(CustomerConsentDummies.consentWithTermId(SOFT_TERM_ID, SOFT_TERM_CODE));
             when(creditCoreMapper.toPendingTermVO(anyList()))
                     .thenReturn(List.of(pendingMandatoryTermVO));
 
@@ -259,10 +258,10 @@ class CreditCoreServiceImplTest {
 
             when(termsCatalogRepository.findLatestActiveByProduct(PRODUCT))
                     .thenReturn(List.of(revokedTerm, softTerm));
-            when(customerConsentRepository.getActiveConsentTermId(CUSTOMER_ID, REVOKED_TERM_CODE))
-                    .thenReturn(Optional.of(REVOKED_TERM_ID));
-            when(customerConsentRepository.getActiveConsentTermId(CUSTOMER_ID, SOFT_TERM_CODE))
-                    .thenReturn(Optional.empty());
+            when(customerConsentRepository.getActiveCustomerConsent(CUSTOMER_ID, REVOKED_TERM_CODE))
+                    .thenReturn(CustomerConsentDummies.consentWithTermId(REVOKED_TERM_ID, REVOKED_TERM_CODE));
+            when(customerConsentRepository.getActiveCustomerConsent(CUSTOMER_ID, SOFT_TERM_CODE))
+                    .thenReturn(null);
             when(creditCoreMapper.toPendingTermVO(anyList()))
                     .thenReturn(List.of(pendingSoftTermVO));
 

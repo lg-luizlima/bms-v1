@@ -31,4 +31,27 @@ public class CustomerConsentDummies {
                 .auditDetails("{\"ip\":\"192.168.0.1\"}")
                 .build();
     }
+
+    /**
+     * CustomerConsentVO for REVOKED_TERM with specific termId.
+     */
+    public static CustomerConsentVO consentWithTermId(UUID termId, String termCode) {
+        return CustomerConsentVO.builder()
+                .id(UUID.randomUUID())
+                .cpfHash(CreditTermDummies.CUSTOMER_ID)
+                .termCode(termCode)
+                .termId(termId)
+                .optIn(Boolean.TRUE)
+                .acceptedAt(Instant.now())
+                .expiresAt(Instant.now().plus(365, ChronoUnit.DAYS))
+                .auditDetails("{\"ip\":\"192.168.0.1\"}")
+                .build();
+    }
+
+    /**
+     * CustomerConsentVO for soft term.
+     */
+    public static CustomerConsentVO softTermConsent() {
+        return consentWithTermId(CreditTermDummies.SOFT_TERM_ID, CreditTermDummies.SOFT_TERM_CODE);
+    }
 }
