@@ -34,6 +34,8 @@ public interface CreditCoreMapper {
     ConsentRequestVO toVO(ConsentRequestDTO request, String cpf);
 
     @Mapping(target = "termId", source = "id")
+    PendingTermVO toPendingTermVO(TermsCatalogVO catalog);
+
     List<PendingTermVO> toPendingTermVO(List<TermsCatalogVO> catalog);
 
     ActiveConsentResponseDTO toActiveConsentResponseDTO(ActiveConsentResponseVO activeConsentResponseVO);
