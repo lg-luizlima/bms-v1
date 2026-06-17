@@ -18,6 +18,7 @@ import br.com.tlf.core.application.mapper.creditcore.CreditCoreMapper;
 import br.com.tlf.core.application.mapper.outboxeventqueue.OutBoxEventQueueMapper;
 import br.com.tlf.core.domain.exception.InvalidTermException;
 import br.com.tlf.core.domain.exception.MandatoryTermNotAcceptedException;
+import br.com.tlf.core.domain.exception.ProductNotFoundException;
 import br.com.tlf.core.domain.vo.consent.AcceptedTermVO;
 import br.com.tlf.core.domain.vo.consent.ConsentRequestVO;
 import br.com.tlf.core.domain.vo.terms.ActiveConsentResponseVO;
@@ -104,6 +105,9 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                 String cpfHash = HmacUtils.generateHmacSha256(JwtTokenUtils.cpfToken(authorization));
 
                 List<TermsCatalogVO> termsCatalog = termsCatalogRepository.findLatestActiveByProduct(product);
+
+                if (termsCatalog.isEmpty())
+                        throw new ProductNotFoundException("Product not found.", List.of("No product was found for " + product));
 
                 List<TermsCatalogVO> signedTerms = termsCatalog.stream()
                                 .filter(t -> isTermSigned(t, cpfHash))

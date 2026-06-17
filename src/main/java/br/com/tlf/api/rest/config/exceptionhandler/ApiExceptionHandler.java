@@ -11,9 +11,11 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import br.com.tlf.api.rest.config.exceptionhandler.model.ProblemDetailResponse;
+import br.com.tlf.core.domain.exception.DomainErrorCode;
 import br.com.tlf.core.domain.exception.InvalidTermException;
 import br.com.tlf.core.domain.exception.MandatoryTermNotAcceptedException;
 import br.com.tlf.core.domain.exception.MissingAuditDataException;
+import br.com.tlf.core.domain.exception.ProductNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,7 +31,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         log.error("[ApiExceptionHandler] missing audit data: {}", ex.getMessage());
 
         ProblemDetailResponse body = ProblemDetailResponse.builder()
-                .errorCode(status.value())
+                .errorCode(DomainErrorCode.MISSING_AUDIT_DATA.getCode())
                 .message("Validation Error")
                 .details("A assinatura de auditoria requer os dados do dispositivo (IP, DeviceId).")
                 .timestamp(Instant.now().toString())
@@ -47,7 +49,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         log.error("[ApiExceptionHandler] invalid term: {}", ex.getMessage());
 
         ProblemDetailResponse body = ProblemDetailResponse.builder()
-                .errorCode(status.value())
+                .errorCode(DomainErrorCode.INVALID_TERM.getCode())
                 .message("Business Validation Error")
                 .details(ex.getMessage())
                 .timestamp(Instant.now().toString())
@@ -65,7 +67,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         log.error("[ApiExceptionHandler] mandatory term not accepted: {}", ex.getMessage());
 
         ProblemDetailResponse body = ProblemDetailResponse.builder()
-                .errorCode(status.value())
+                .errorCode(DomainErrorCode.MANDATORY_TERM_NOT_ACCEPTED.getCode())
                 .message("Business Validation Error")
                 .details(ex.getMessage())
                 .timestamp(Instant.now().toString())
@@ -75,6 +77,25 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
         return ResponseEntity.status(status).body(body);
     }
+
+    @ExceptionHandler(ProductNotFoundException.class)
+    public ResponseEntity<ProblemDetailResponse> productNotFoundException(ProductNotFoundException ex, WebRequest request) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+
+        log.error("[ApiExceptionHandler] product not found: {}", ex.getMessage());
+
+        ProblemDetailResponse body = ProblemDetailResponse.builder()
+                .errorCode(ex.getErrorCode().getCode())
+                .message("Business Validation Error")
+                .details(ex.getMessage())
+                .timestamp(Instant.now().toString())
+                .traceId(UUID.randomUUID().toString())
+                .errors(ex.getErrors())
+                .build();
+
+        return ResponseEntity.status(status).body(body);
+    }
+
     //Keep this handler as the last one, to catch any unexpected exceptions that may occur in the application
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetailResponse> handleUnexpectedException(Exception ex, WebRequest request) {
@@ -83,7 +104,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         log.error("[ApiExceptionHandler] unexpected error: {}", ex.getMessage(), ex);
 
         ProblemDetailResponse body = ProblemDetailResponse.builder()
-                .errorCode(status.value())
+                .errorCode(DomainErrorCode.UNEXPECTED_ERROR.getCode())
                 .message("Internal Server Error")
                 .details("An unexpected error occurred. Please try again later.")
                 .timestamp(Instant.now().toString())
