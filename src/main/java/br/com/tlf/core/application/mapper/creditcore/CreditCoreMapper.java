@@ -27,11 +27,11 @@ public interface CreditCoreMapper {
     CreditCoreMapper INSTANCE = Mappers.getMapper(CreditCoreMapper.class);
     ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    @Mapping(target = "cpf", source = "cpf")
+    @Mapping(target = "customerId", source = "customerId")
     @Mapping(target = "product", source = "request.product")
     @Mapping(target = "acceptedTerms", source = "request.acceptedTerms")
     @Mapping(target = "signature", source = "request.signature")
-    ConsentRequestVO toVO(ConsentRequestDTO request, String cpf);
+    ConsentRequestVO toVO(ConsentRequestDTO request, String customerId);
 
     @Mapping(target = "termId", source = "id")
     PendingTermVO toPendingTermVO(TermsCatalogVO catalog);
@@ -40,14 +40,14 @@ public interface CreditCoreMapper {
 
     ActiveConsentResponseDTO toActiveConsentResponseDTO(ActiveConsentResponseVO activeConsentResponseVO);
 
-    @Mapping(target = "cpfHash", source = "cpfHash")
+    @Mapping(target = "customerId", source = "cpfToken")
     @Mapping(target = "termCode", source = "acceptedTerm.termCode")
     @Mapping(target = "termId", source = "termCatalog.id")
     @Mapping(target = "optIn", source = "acceptedTerm.optIn")
     @Mapping(target = "acceptedAt", expression = "java(java.time.Instant.now())")
     @Mapping(target = "expiresAt", expression = "java(calculateExpiresAt(termCatalog))")
     @Mapping(target = "auditDetails", expression = "java(serializeAuditDetails(consentRequestVO))")
-    CustomerConsentVO toCustomerConsentVO(String cpfHash, ConsentRequestVO consentRequestVO, AcceptedTermVO acceptedTerm, TermsCatalogVO termCatalog);
+    CustomerConsentVO toCustomerConsentVO(String cpfToken, ConsentRequestVO consentRequestVO, AcceptedTermVO acceptedTerm, TermsCatalogVO termCatalog);
 
     default Instant calculateExpiresAt(TermsCatalogVO termCatalog) {
         long days = termCatalog.getValidityDays() != null

@@ -52,25 +52,25 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         @Override
         public void createConsent(String authorization, ConsentRequestDTO requestDTO) {
 
-                String cpfHash = HmacUtils.generateHmacSha256(JwtTokenUtils.cpfToken(authorization));
+                String customerId = JwtTokenUtils.cpfToken(authorization);
 
-                ConsentRequestVO consentRequestVO = creditCoreMapper.toVO(requestDTO, cpfHash);
+                ConsentRequestVO consentRequestVO = creditCoreMapper.toVO(requestDTO, customerId);
 
                 List<TermsCatalogVO> latestActiveByProduct = termsCatalogRepository
                                 .findLatestActiveByProduct(requestDTO.getProduct());
 
-                validateMandatoryTerms(latestActiveByProduct, consentRequestVO.getAcceptedTerms(), cpfHash);
+                validateMandatoryTerms(latestActiveByProduct, consentRequestVO.getAcceptedTerms(), customerId);
 
-                processAcceptedTerms(cpfHash, consentRequestVO, latestActiveByProduct);
+                processAcceptedTerms(customerId, consentRequestVO, latestActiveByProduct);
                 
                 redisTemplate.opsForValue().set(
-                                "sync_status:" + consentRequestVO.getCpf(),
+                                "sync_status:" + consentRequestVO.getCustomerId(),
                                 "PROCESSING",
                                 MAX_VALIDITY_DAYS,
                                 TimeUnit.DAYS);
         }
 
-        private void processAcceptedTerms(String cpfHash, ConsentRequestVO consentRequestVO,
+        private void processAcceptedTerms(String cpfToken, ConsentRequestVO consentRequestVO,
                         List<TermsCatalogVO> latestActiveByProduct) {
                 Map<String, TermsCatalogVO> catalogMap = latestActiveByProduct.stream()
                                 .collect(Collectors.toMap(
@@ -92,8 +92,8 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                                                 List.of(acceptedTerm.getTermCode()));
                         }
 
-                        if (!isTermSigned(catalogTerm, cpfHash)) {
-                                CustomerConsentVO consent = creditCoreMapper.toCustomerConsentVO(cpfHash, consentRequestVO, acceptedTerm, catalogTerm); //buildCustomerConsentVO(catalogTerm, acceptedTerm, cpfHash, consentRequestVO);
+                        if (!isTermSigned(catalogTerm, cpfToken)) {
+                                CustomerConsentVO consent = creditCoreMapper.toCustomerConsentVO(cpfToken, consentRequestVO, acceptedTerm, catalogTerm);
                                 saveConsent(consent);
                         }
                 }
@@ -102,7 +102,7 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         @Override
         public ActiveConsentResponseDTO getPendingTerms(String authorization, String product) {
 
-                String cpfHash = HmacUtils.generateHmacSha256(JwtTokenUtils.cpfToken(authorization));
+                String customerId = JwtTokenUtils.cpfToken(authorization);
 
                 List<TermsCatalogVO> termsCatalog = termsCatalogRepository.findLatestActiveByProduct(product);
 
@@ -110,15 +110,22 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                         throw new ProductNotFoundException("Product not found.", List.of("No product was found for " + product));
 
                 List<TermsCatalogVO> signedTerms = termsCatalog.stream()
-                                .filter(t -> isTermSigned(t, cpfHash))
+                                .filter(t -> isTermSigned(t, customerId))
                                 .toList();
 
                 List<TermsCatalogVO> pendingTerms = termsCatalog.stream()
                                 .filter(t -> !signedTerms.contains(t))
                                 .toList();
-                
+
                 Boolean hasPendingMandatoryTerms = pendingTerms.stream()
                                 .anyMatch((pendingTerm) -> Boolean.TRUE.equals(pendingTerm.getIsMandatory()));
+
+                //Test
+                log.warn("[getPendingTerms] Pending terms for CPF hash {} and product {}: {}", customerId, product, pendingTerms.size());
+                pendingTerms
+                .stream()
+                .map(String::valueOf)
+                .forEach(log::info);        
 
                 ActiveConsentResponseVO build = ActiveConsentResponseVO.builder()
                                 .product(termsCatalog.getFirst().getProduct())
@@ -134,7 +141,7 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         private void saveConsent(CustomerConsentVO consent) {
                 customerConsentRepository.saveConsent(consent);
                 OutboxEventQueueJpaEntity outboxEvent = outBoxEventQueueMapper.toEntity(
-                                consent.getId().toString(), toJson(consent));
+                                consent.getCustomerId(), toJson(consent));
                 outboxEventQueueRepository.save(outboxEvent);
         }
 
@@ -147,21 +154,21 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                 }
         }
 
-        private boolean isTermSigned(TermsCatalogVO term, String cpfHash) {
+        private boolean isTermSigned(TermsCatalogVO term, String cpfToken) {
                 CustomerConsentVO existingConsent = customerConsentRepository
-                                .getActiveCustomerConsent(cpfHash, term.getTermCode());
+                                .getActiveCustomerConsent(cpfToken, term.getTermCode());
 
                 return existingConsent != null && existingConsent.getTermId().equals(term.getId());
         }
 
-        private void validateMandatoryTerms(List<TermsCatalogVO> catalogTerms, List<AcceptedTermVO> acceptedTerms, String cpfHash) {
-                
+        private void validateMandatoryTerms(List<TermsCatalogVO> catalogTerms, List<AcceptedTermVO> acceptedTerms, String cpfToken) {
+
                 Map<String, Boolean> acceptedTermsMap = acceptedTerms.stream()
                                 .collect(Collectors.toMap(AcceptedTermVO::getTermCode, AcceptedTermVO::getOptIn));
 
                 List<String> missingMandatoryTerms = catalogTerms.stream()
                                 .filter(term -> Boolean.TRUE.equals(term.getIsMandatory()))
-                                .filter(term -> !isTermSigned(term, cpfHash))
+                                .filter(term -> !isTermSigned(term, cpfToken))
                                 .filter(term -> {
                                         Boolean optIn = acceptedTermsMap.get(term.getTermCode());
                                         return optIn == null || Boolean.FALSE.equals(optIn);

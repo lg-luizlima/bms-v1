@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 public class CustomerConsentVO {
 
     private UUID id;
-    private String cpfHash;
+    private String customerId;
     private String termCode;
     private UUID termId;
     private Boolean optIn;

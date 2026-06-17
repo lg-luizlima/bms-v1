@@ -13,7 +13,7 @@ import java.util.List;
 @NoArgsConstructor
 public class ConsentRequestVO {
 
-    private String cpf;
+    private String customerId;
     private String product;
     private List<AcceptedTermVO> acceptedTerms;
     private SignatureVO signature;
