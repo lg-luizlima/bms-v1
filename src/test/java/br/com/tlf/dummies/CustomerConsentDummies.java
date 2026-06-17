@@ -22,7 +22,7 @@ public class CustomerConsentDummies {
     public static CustomerConsentVO revokedTermConsent() {
         return CustomerConsentVO.builder()
                 .id(CONSENT_ID)
-                .cpfHash(CreditTermDummies.CUSTOMER_ID)
+                .customerId(CreditTermDummies.CUSTOMER_ID)
                 .termCode(CreditTermDummies.REVOKED_TERM_CODE)
                 .termId(CreditTermDummies.REVOKED_TERM_ID)
                 .optIn(Boolean.TRUE)
@@ -38,7 +38,7 @@ public class CustomerConsentDummies {
     public static CustomerConsentVO consentWithTermId(UUID termId, String termCode) {
         return CustomerConsentVO.builder()
                 .id(UUID.randomUUID())
-                .cpfHash(CreditTermDummies.CUSTOMER_ID)
+                .customerId(CreditTermDummies.CUSTOMER_ID)
                 .termCode(termCode)
                 .termId(termId)
                 .optIn(Boolean.TRUE)

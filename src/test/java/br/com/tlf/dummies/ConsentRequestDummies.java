@@ -66,7 +66,7 @@ public class ConsentRequestDummies {
      */
     public static ConsentRequestVO consentRequestVO() {
         return ConsentRequestVO.builder()
-                .cpf(CreditTermDummies.CUSTOMER_ID)
+                .customerId(CreditTermDummies.CUSTOMER_ID)
                 .product(CreditTermDummies.PRODUCT)
                 .acceptedTerms(List.of(acceptedRevokedTermVO()))
                 .signature(signatureVO())
@@ -76,7 +76,7 @@ public class ConsentRequestDummies {
     /** VO for the missing-mandatory-term scenario: empty acceptedTerms. */
     public static ConsentRequestVO consentRequestVOMissingTerm() {
         return ConsentRequestVO.builder()
-                .cpf(CreditTermDummies.CUSTOMER_ID)
+                .customerId(CreditTermDummies.CUSTOMER_ID)
                 .product(CreditTermDummies.PRODUCT)
                 .acceptedTerms(Collections.emptyList())
                 .signature(signatureVO())
