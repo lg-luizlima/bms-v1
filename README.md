@@ -177,6 +177,7 @@ Segundo a imagem acima, temos as seguintes camadas:
 
 
 
+
 O núcleo da aplicação interage com o mundo exterior por meio de "portas", que são interfaces bem definidas. As portas são implementadas por adaptadores que detêm o contexto da tecnologia utilizada, proporcionando uma camada de abstração entre a lógica de negócio e a tecnologia adotada.
 
 Para garantir a coesão da lógica de negócio, os Dto´s devem estar separados em duas categorias: entrada e saída. Essa separação é importante para garantir a clareza das responsabilidades de cada componente. É importante também separar os modelos de domínio, para que a arquitetura Vexa forneça flexibilidade e escalabilidade à aplicação.
