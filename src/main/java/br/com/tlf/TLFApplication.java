@@ -8,6 +8,7 @@ public class TLFApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(TLFApplication.class, args);
+		
 	}
 
 }
