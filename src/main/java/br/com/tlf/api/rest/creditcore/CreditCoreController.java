@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.com.tlf.api.rest.UrlConstant;
-import br.com.tlf.api.rest.assembler.Assembler;
+import br.com.tlf.api.rest.assembler.CreditCoreAssembler;
 import br.com.tlf.api.rest.shared.ResponseDTO;
 import br.com.tlf.core.port.in.creditcore.CreditCorePortIn;
 import br.com.tlf.core.port.in.dto.request.ConsentRequestDTO;
@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 public class CreditCoreController {
 
     private final CreditCorePortIn creditCoreService;
-    private final Assembler assembler;
+    private final CreditCoreAssembler assembler;
 
     @GetMapping(UrlConstant.TERMS_URI)
     @ResponseStatus(HttpStatus.OK)

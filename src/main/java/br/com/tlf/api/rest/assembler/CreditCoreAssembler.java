@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 import br.com.tlf.api.rest.shared.ResponseDTO;
 
 @Component
-public class Assembler {
+public class CreditCoreAssembler {
 
     public ResponseDTO toResponseDTO(Object data, String status, String message) {
 
