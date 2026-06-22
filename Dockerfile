@@ -35,6 +35,8 @@ ENV JAVA_OPTS="\
 -XX:+UseContainerSupport \
 -Djava.security.egd=file:/dev/./urandom"
 
+RUN addgroup -S app && adduser -S app -G app
+
 USER app
 
 EXPOSE 8082
