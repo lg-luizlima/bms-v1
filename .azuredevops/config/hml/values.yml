@@ -171,7 +171,7 @@ liveness:
   initialDelaySeconds: 10
   periodSeconds: 10
   successThreshold: 1
-  timeoutSeconds: 120
+  timeoutSeconds: 220
   healthCheck: /actuator/health
 
 # See https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
@@ -180,7 +180,7 @@ readiness:
   failureThreshold: 3
   periodSeconds: 10
   successThreshold: 1
-  timeoutSeconds: 120
+  timeoutSeconds: 220
   healthCheck: /actuator/health
 
 ####################################################################################################################
