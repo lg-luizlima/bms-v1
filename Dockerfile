@@ -1,4 +1,10 @@
-FROM vcr-docker.nexus.telefonica.com.br/base/code/java/21/runtime:1.0.2
+FROM acrsharedservices01.azurecr.io/docker.io/library/eclipse-temurin:21-jre-alpine
+
+RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories \ 
+    && apk update \
+    && apk upgrade --no-cache --available \
+    && apk add --no-cache --upgrade musl@edge musl-utils@edge \ 
+    && rm -rf /var/cache/apk/*
 
 ARG APPLICATION_NAME
 ENV APPLICATION_NAME=$APPLICATION_NAME
