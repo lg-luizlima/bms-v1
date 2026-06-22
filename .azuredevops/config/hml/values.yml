@@ -139,7 +139,7 @@ ingress:
 #     allowMethods: ["POST", "GET", "PUT", "DELETE", "OPTIONS", "PATCH", "TRACE", "HEAD", "CONNECT" ]
 
 # See https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-resources: {}
+resources:
   limits:
     cpu: 500m
     memory: 512Mi
