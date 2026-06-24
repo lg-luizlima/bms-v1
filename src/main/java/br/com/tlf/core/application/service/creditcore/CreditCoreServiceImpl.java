@@ -28,10 +28,11 @@ import br.com.tlf.core.port.in.creditcore.CreditCorePortIn;
 import br.com.tlf.core.port.in.dto.request.ConsentRequestDTO;
 import br.com.tlf.core.port.in.dto.response.ActiveConsentResponseDTO;
 import br.com.tlf.core.port.out.customerconsent.CustomerConsentRepository;
+import br.com.tlf.core.port.out.eventhub.EventHubPort;
+import br.com.tlf.core.port.out.eventhub.dto.request.EventHubRequestDTO;
 import br.com.tlf.core.port.out.termscatalog.TermsCatalogRepository;
 import br.com.tlf.infrastructure.persistence.postgresql.entity.OutboxEventQueueJpaEntity;
 import br.com.tlf.infrastructure.persistence.postgresql.jpa.OutboxEventQueueJpaRepository;
-import br.com.tlf.shared.util.HmacUtils;
 import br.com.tlf.shared.util.jwt.JwtTokenUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,9 +49,16 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         private final OutBoxEventQueueMapper outBoxEventQueueMapper;
         private final ObjectMapper objectMapper;
         private final StringRedisTemplate redisTemplate;
+        private final EventHubPort eventHubPort;
 
         @Override
         public void createConsent(String authorization, ConsentRequestDTO requestDTO) {
+
+
+                eventHubPort.sendEvent(EventHubRequestDTO.builder()
+                                .event(requestDTO)
+                                .eventType("CREATE_CONSENT_REQUEST")
+                                .build());
 
                 String customerId = JwtTokenUtils.cpfToken(authorization);
 

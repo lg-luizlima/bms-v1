@@ -29,8 +29,7 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   data:
     redis:
-      host: 127.0.0.1
-      port: 6379
+      host: ${BMS_REDIS_HOST}
   thread-executor: virtual
 
 azure:
