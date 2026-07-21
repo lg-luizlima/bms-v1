@@ -34,8 +34,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import br.com.tlf.core.application.mapper.creditcore.CreditCoreMapper;
 import br.com.tlf.core.application.mapper.outboxeventqueue.OutBoxEventQueueMapper;
 import br.com.tlf.core.domain.exception.MandatoryTermNotAcceptedException;
@@ -53,6 +51,7 @@ import br.com.tlf.dummies.CustomerConsentDummies;
 import br.com.tlf.infrastructure.persistence.postgresql.entity.OutboxEventQueueJpaEntity;
 import br.com.tlf.infrastructure.persistence.postgresql.jpa.OutboxEventQueueJpaRepository;
 import br.com.tlf.shared.util.HmacUtils;
+import br.com.tlf.shared.util.JsonSerializer;
 import br.com.tlf.shared.util.jwt.JwtTokenUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,7 +62,7 @@ class CreditCoreServiceImplTest {
     @Mock private OutboxEventQueueJpaRepository outboxEventQueueRepository;
     @Mock private CreditCoreMapper creditCoreMapper;
     @Mock private OutBoxEventQueueMapper outBoxEventQueueMapper;
-    @Mock private ObjectMapper objectMapper;
+    @Mock private JsonSerializer jsonSerializer;
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private ValueOperations<String, String> valueOperations;
 
@@ -95,7 +94,7 @@ class CreditCoreServiceImplTest {
                     eq(CUSTOMER_ID), eq(requestVO),
                     eq(ConsentRequestDummies.acceptedRevokedTermVO()), eq(revokedTerm)))
                     .thenReturn(consentVO);
-            when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+            when(jsonSerializer.toJson(any())).thenReturn("{}");
             when(outBoxEventQueueMapper.toEntity(eq(CustomerConsentDummies.CONSENT_ID.toString()), any()))
                     .thenReturn(outboxEntity);
             when(redisTemplate.opsForValue()).thenReturn(valueOperations);

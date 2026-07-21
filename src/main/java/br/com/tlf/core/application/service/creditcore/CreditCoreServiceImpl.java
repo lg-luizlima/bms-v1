@@ -11,9 +11,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import br.com.tlf.core.application.mapper.creditcore.CreditCoreMapper;
 import br.com.tlf.core.application.mapper.outboxeventqueue.OutBoxEventQueueMapper;
 import br.com.tlf.core.domain.exception.InvalidTermException;
@@ -33,6 +30,7 @@ import br.com.tlf.core.port.out.eventhub.dto.request.EventHubRequestDTO;
 import br.com.tlf.core.port.out.termscatalog.TermsCatalogRepository;
 import br.com.tlf.infrastructure.persistence.postgresql.entity.OutboxEventQueueJpaEntity;
 import br.com.tlf.infrastructure.persistence.postgresql.jpa.OutboxEventQueueJpaRepository;
+import br.com.tlf.shared.util.JsonSerializer;
 import br.com.tlf.shared.util.jwt.JwtTokenUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +45,7 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         private final OutboxEventQueueJpaRepository outboxEventQueueRepository;
         private final CreditCoreMapper creditCoreMapper;
         private final OutBoxEventQueueMapper outBoxEventQueueMapper;
-        private final ObjectMapper objectMapper;
+        private final JsonSerializer jsonSerializer;
         private final StringRedisTemplate redisTemplate;
         private final EventHubPort eventHubPort;
 
@@ -149,17 +147,8 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         private void saveConsent(CustomerConsentVO consent) {
                 customerConsentRepository.saveConsent(consent);
                 OutboxEventQueueJpaEntity outboxEvent = outBoxEventQueueMapper.toEntity(
-                                consent.getCustomerId(), toJson(consent));
+                                consent.getCustomerId(), jsonSerializer.toJson(consent));
                 outboxEventQueueRepository.save(outboxEvent);
-        }
-
-        private String toJson(Object value) {
-                try {
-                        return objectMapper.writeValueAsString(value);
-                } catch (JsonProcessingException e) {
-                        log.error("Error serializing object to JSON: {}", e.getMessage());
-                        throw new IllegalStateException("Failed to serialize object to JSON", e);
-                }
         }
 
         private boolean isTermSigned(TermsCatalogVO term, String cpfToken) {

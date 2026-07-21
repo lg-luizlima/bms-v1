@@ -1,9 +1,7 @@
 # NUNCA DEFINA VALORES SECRETOS AQUI. Utilize o secrets.yml na raiz do .azuredevops
 env:
-- name: JAVA_OPTS_MEMORY_MIN
-  value: 256m
-- name: JAVA_OPTS_MEMORY_MAX
-  value: 512m
+- name: SPRING_PROFILES_ACTIVE
+  value: dev
 - name: JAVA_OPTS_METASPACE_MIN
   value: 64m
 - name: JAVA_OPTS_METASPACE_MAX

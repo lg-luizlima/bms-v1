@@ -141,11 +141,11 @@ ingress:
 # See https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 resources:
   limits:
-    cpu: 500m
+    cpu: 800m
     memory: 512Mi
   requests:
-    cpu: 100m
-    memory: 128Mi
+    cpu: 300m
+    memory: 256Mi
 
 # See https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
 autoscaling:

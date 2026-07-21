@@ -1,6 +1,23 @@
 server:
   port: 8082
 
+# LOCAL DEVELOPMENT SETUP:
+# Before running the application locally, you must:
+# 1. Start PostgreSQL, Redis, and Kafka using docker-compose:
+#    cd docker-compose && docker-compose up -d
+#
+# 2. Set environment variables (or provide via IDE run configuration):
+#    export BMS_DATABASE_URL=jdbc:postgresql://localhost:5433/ms_vivopay
+#    export BMS_DATABASE_USERNAME=postgres
+#    export BMS_DATABASE_PASSWORD=postgres
+#
+# 3. Optional: Set Azure Event Hub configuration (leave blank to skip Event Hub publishing):
+#    export EVENTHUB_CONNECTION_STRING=<your-connection-string>
+#    export EVENTHUB_NAME=<your-event-hub-name>
+#
+# Then run:
+#    ./mvnw spring-boot:run
+
 management:
   endpoint:
     health:
@@ -16,9 +33,9 @@ spring:
   application:
     name: core-architecture-ri
   datasource:
-    url: ${BMS_DATABASE_URL}
-    username: ${BMS_DATABASE_USERNAME}
-    password: ${BMS_DATABASE_PASSWORD}
+    url: ${BMS_DATABASE_URL:jdbc:postgresql://localhost:5433/ms_vivopay}
+    username: ${BMS_DATABASE_USERNAME:postgres}
+    password: ${BMS_DATABASE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -35,8 +52,8 @@ spring:
 
 azure:
   eventhub:
-    connection-string: ${EVENTHUB_CONNECTION_STRING}
-    event-hub-name: ${EVENTHUB_NAME}
+    connection-string: ${EVENTHUB_CONNECTION_STRING:}
+    event-hub-name: ${EVENTHUB_NAME:}
 
 springdoc:
   swagger-ui:
