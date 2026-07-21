@@ -10,11 +10,11 @@ import com.azure.messaging.eventhubs.EventData;
 import com.azure.messaging.eventhubs.EventDataBatch;
 import com.azure.messaging.eventhubs.EventHubClientBuilder;
 import com.azure.messaging.eventhubs.EventHubProducerClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import br.com.tlf.core.port.out.eventhub.EventHubPort;
 import br.com.tlf.core.port.out.eventhub.dto.request.EventHubRequestDTO;
 import br.com.tlf.infrastructure.eventhub.config.EventHubConfig;
+import br.com.tlf.shared.util.JsonSerializer;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -27,22 +27,36 @@ public class EventHubAdapter implements EventHubPort {
 
     private final EventHubConfig eventHubConfig;
     private EventHubProducerClient producer;
-    private final ObjectMapper objectMapper;
+    private final JsonSerializer jsonSerializer;
 
     @PostConstruct
     public void init() {
-        this.producer = new EventHubClientBuilder()
-            .connectionString(eventHubConfig.getConnectionString(), eventHubConfig.getEventHubName())
-            .buildProducerClient();
+        if (eventHubConfig.getConnectionString() == null || eventHubConfig.getEventHubName() == null) {
+            log.warn("EventHub configuration not provided (connection-string or event-hub-name is null). EventHub adapter will not be initialized. This is expected for local development without Azure Event Hub.");
+            return;
+        }
+
+        try {
+            this.producer = new EventHubClientBuilder()
+                .connectionString(eventHubConfig.getConnectionString(), eventHubConfig.getEventHubName())
+                .buildProducerClient();
+            log.info("EventHub adapter initialized successfully");
+        } catch (Exception e) {
+            log.error("Failed to initialize EventHub adapter", e);
+        }
     }
 
 
     @Override
     public void sendEvent(EventHubRequestDTO request) {
-        
+        if (producer == null) {
+            log.warn("EventHub producer is not initialized. Event will not be sent. Configure 'azure.eventhub.connection-string' and 'azure.eventhub.event-hub-name' to enable Event Hub publishing.");
+            return;
+        }
+
         try {
             EventData eventData = new EventData(
-                    objectMapper.writeValueAsString(request.getEvent())
+                    jsonSerializer.toJson(request.getEvent())
             );
             eventData.getProperties().putAll(Map.of("event_type", request.getEventType(), "product", APPLICATION_NAME));
             EventDataBatch batch = producer.createBatch();
@@ -58,7 +72,12 @@ public class EventHubAdapter implements EventHubPort {
     @PreDestroy
     public void cleanup() {
         if (producer != null) {
-            producer.close();
+            try {
+                producer.close();
+                log.info("EventHub producer closed successfully");
+            } catch (Exception e) {
+                log.error("Error closing EventHub producer", e);
+            }
         }
     }
 
