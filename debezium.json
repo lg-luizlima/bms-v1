@@ -1,0 +1,26 @@
+{
+  "name": "credit-consent-outbox-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "plugin.name": "pgoutput",
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "postgres",
+    "database.password": "postgres",
+    "database.dbname": "ms_vivopay",
+    "topic.prefix": "credit-consent-cdc",
+    "slot.name": "credit_consent_outbox_slot",
+    "publication.name": "credit_consent_publication",
+    "publication.autocreate.mode": "filtered",
+    "table.include.list": "credit_consent.tb_outbox_events",
+    "tombstones.on.delete": "false",
+    "transforms": "outbox",
+    "transforms.outbox.type": "io.debezium.transforms.outbox.EventRouter",
+    "transforms.outbox.route.by.field": "topic_name",
+    "transforms.outbox.route.topic.replacement": "${routedByValue}",
+    "transforms.outbox.table.field.event.id": "event_id",
+    "transforms.outbox.table.field.event.key": "aggregate_id",
+    "transforms.outbox.table.field.event.payload": "payload",
+    "transforms.outbox.table.fields.additional.placement": "aggregate_type:header:eventType,aggregate_id:header:aggregateId,created_at:header:createdAt,event_id:header:eventId"
+  }
+}

@@ -40,6 +40,7 @@ public interface CreditCoreMapper {
 
     ActiveConsentResponseDTO toActiveConsentResponseDTO(ActiveConsentResponseVO activeConsentResponseVO);
 
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "customerId", source = "cpfToken")
     @Mapping(target = "termCode", source = "acceptedTerm.termCode")
     @Mapping(target = "termId", source = "termCatalog.id")

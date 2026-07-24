@@ -9,5 +9,5 @@ public class ApplicationConstants {
     public static final int DEFAULT_CODECS_SIZE = 16 * 1024 * 1024;
     public static final Long MAX_VALIDITY_DAYS = 30L;
     public static final String AGGREGATE_TYPE = "ConsentRegisteredEvent";
-    public static final String TOPIC_NAME = "vivopay.credit.onboarding.consent.registered.v1";
+    public static final String TOPIC_NAME = "vivopay.credit.consent.events.v1";
 }

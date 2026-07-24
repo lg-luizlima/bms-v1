@@ -7,13 +7,19 @@ server:
 #    cd docker-compose && docker-compose up -d
 #
 # 2. Set environment variables (or provide via IDE run configuration):
-#    export BMS_DATABASE_URL=jdbc:postgresql://localhost:5433/ms_vivopay
+#    export BMS_DATABASE_URL=jdbc:postgresql://localhost:5433/ms_vivopay?currentSchema=credit_consent
 #    export BMS_DATABASE_USERNAME=postgres
 #    export BMS_DATABASE_PASSWORD=postgres
+#
+#    Schema dedicado "credit_consent" (não mais "public") — o Flyway cria o schema
+#    automaticamente no primeiro start (spring.flyway.create-schemas: true).
 #
 # 3. Optional: Set Azure Event Hub configuration (leave blank to skip Event Hub publishing):
 #    export EVENTHUB_CONNECTION_STRING=<your-connection-string>
 #    export EVENTHUB_NAME=<your-event-hub-name>
+#
+# 4. Parallel Event Hub publish toggle during Debezium transition:
+#    export EVENTHUB_PARALLEL_PUBLISH_ENABLED=true
 #
 # Then run:
 #    ./mvnw spring-boot:run
@@ -24,26 +30,36 @@ management:
       enabled: true
 
 tlf:
-  logging:
-    enabled: true
-    disable-json-format-in-console: true
   lending: {}
 
 spring:
   application:
     name: core-architecture-ri
   datasource:
-    url: ${BMS_DATABASE_URL:jdbc:postgresql://localhost:5433/ms_vivopay}
+    url: ${BMS_DATABASE_URL:jdbc:postgresql://localhost:5433/ms_vivopay?currentSchema=credit_consent}
     username: ${BMS_DATABASE_USERNAME:postgres}
     password: ${BMS_DATABASE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
+      ddl-auto: validate
       naming:
         physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: true
+  flyway:
+    enabled: true
+    url: ${BMS_DATABASE_URL:jdbc:postgresql://localhost:5433/ms_vivopay?currentSchema=credit_consent}
+    user: ${BMS_DATABASE_USERNAME:postgres}
+    password: ${BMS_DATABASE_PASSWORD:postgres}
+    schemas: credit_consent
+    create-schemas: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+
   data:
     redis:
       host: 127.0.0.1
@@ -54,6 +70,10 @@ azure:
   eventhub:
     connection-string: ${EVENTHUB_CONNECTION_STRING:}
     event-hub-name: ${EVENTHUB_NAME:}
+
+features:
+  eventhub:
+    parallel-publish-enabled: ${EVENTHUB_PARALLEL_PUBLISH_ENABLED:true}
 
 springdoc:
   swagger-ui:

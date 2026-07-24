@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -23,6 +24,7 @@ import static org.mockito.Mockito.when;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,23 +35,27 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import br.com.tlf.core.application.mapper.creditcore.CreditCoreMapper;
 import br.com.tlf.core.application.mapper.outboxeventqueue.OutBoxEventQueueMapper;
 import br.com.tlf.core.domain.exception.MandatoryTermNotAcceptedException;
+import br.com.tlf.core.domain.vo.OutBoxEventQueueVO;
 import br.com.tlf.core.domain.vo.consent.ConsentRequestVO;
 import br.com.tlf.core.domain.vo.terms.ActiveConsentResponseVO;
 import br.com.tlf.core.domain.vo.terms.CustomerConsentVO;
 import br.com.tlf.core.domain.vo.terms.PendingTermVO;
 import br.com.tlf.core.domain.vo.terms.TermsCatalogVO;
 import br.com.tlf.core.port.in.dto.response.ActiveConsentResponseDTO;
+import br.com.tlf.core.port.in.dto.response.ConsentResponseDTO;
 import br.com.tlf.core.port.out.customerconsent.CustomerConsentRepository;
+import br.com.tlf.core.port.out.eventhub.EventHubPort;
+import br.com.tlf.core.port.out.outbox.OutboxEventQueueRepository;
 import br.com.tlf.core.port.out.termscatalog.TermsCatalogRepository;
 import br.com.tlf.dummies.ConsentRequestDummies;
 import br.com.tlf.dummies.CreditTermDummies;
 import br.com.tlf.dummies.CustomerConsentDummies;
-import br.com.tlf.infrastructure.persistence.postgresql.entity.OutboxEventQueueJpaEntity;
-import br.com.tlf.infrastructure.persistence.postgresql.jpa.OutboxEventQueueJpaRepository;
 import br.com.tlf.shared.util.HmacUtils;
 import br.com.tlf.shared.util.JsonSerializer;
 import br.com.tlf.shared.util.jwt.JwtTokenUtils;
@@ -59,15 +65,25 @@ class CreditCoreServiceImplTest {
 
     @Mock private CustomerConsentRepository customerConsentRepository;
     @Mock private TermsCatalogRepository termsCatalogRepository;
-    @Mock private OutboxEventQueueJpaRepository outboxEventQueueRepository;
+    @Mock private OutboxEventQueueRepository outboxEventQueueRepository;
     @Mock private CreditCoreMapper creditCoreMapper;
     @Mock private OutBoxEventQueueMapper outBoxEventQueueMapper;
     @Mock private JsonSerializer jsonSerializer;
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private ValueOperations<String, String> valueOperations;
+    @Mock private EventHubPort eventHubPort;
+    @Mock private TransactionTemplate transactionTemplate;
 
     @InjectMocks
     private CreditCoreServiceImpl underTest;
+
+    @SuppressWarnings("unchecked")
+    private void stubTransactionTemplateToRunLambda() {
+        doAnswer(invocation -> {
+            invocation.<Consumer<TransactionStatus>>getArgument(0).accept(mock(TransactionStatus.class));
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
+    }
 
     // ─── createConsent ────────────────────────────────────────────────────────
 
@@ -76,13 +92,18 @@ class CreditCoreServiceImplTest {
         TermsCatalogVO revokedTerm = CreditTermDummies.revokedTerm();
         ConsentRequestVO requestVO = ConsentRequestDummies.consentRequestVO();
         CustomerConsentVO consentVO = CustomerConsentDummies.revokedTermConsent();
-        OutboxEventQueueJpaEntity outboxEntity = mock(OutboxEventQueueJpaEntity.class);
+        OutBoxEventQueueVO outboxVO = OutBoxEventQueueVO.builder()
+                .aggregateId(CUSTOMER_ID)
+                .payload("{}")
+                .build();
 
         try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class);
              MockedStatic<HmacUtils> hmacMock = mockStatic(HmacUtils.class)) {
 
             jwtMock.when(() -> JwtTokenUtils.cpfToken(BEARER_TOKEN)).thenReturn(CPF_PLAIN);
             hmacMock.when(() -> HmacUtils.generateHmacSha256(CPF_PLAIN)).thenReturn(CUSTOMER_ID);
+
+            stubTransactionTemplateToRunLambda();
 
             when(creditCoreMapper.toVO(ConsentRequestDummies.requestWithMandatoryTerm(), CUSTOMER_ID))
                     .thenReturn(requestVO);
@@ -95,14 +116,17 @@ class CreditCoreServiceImplTest {
                     eq(ConsentRequestDummies.acceptedRevokedTermVO()), eq(revokedTerm)))
                     .thenReturn(consentVO);
             when(jsonSerializer.toJson(any())).thenReturn("{}");
-            when(outBoxEventQueueMapper.toEntity(eq(CustomerConsentDummies.CONSENT_ID.toString()), any()))
-                    .thenReturn(outboxEntity);
+            when(outBoxEventQueueMapper.toVO(eq(CUSTOMER_ID), any()))
+                    .thenReturn(outboxVO);
             when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-            underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm());
+            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm());
 
+            assertThat(response).isNotNull();
+            assertThat(response.getConsentReceivedAt()).isNotNull();
+            verify(eventHubPort).sendEvent(any());
             verify(customerConsentRepository).saveConsent(consentVO);
-            verify(outboxEventQueueRepository).save(outboxEntity);
+            verify(outboxEventQueueRepository).save(outboxVO);
             verify(valueOperations).set("sync_status:" + CUSTOMER_ID, "PROCESSING", MAX_VALIDITY_DAYS, TimeUnit.DAYS);
         }
     }
@@ -130,6 +154,7 @@ class CreditCoreServiceImplTest {
             assertThat(ex.getErrors()).hasSize(1);
             assertThat(ex.getErrors().get(0)).contains(REVOKED_TERM_CODE);
 
+            verify(eventHubPort).sendEvent(any());
             verify(customerConsentRepository, never()).saveConsent(any());
             verify(outboxEventQueueRepository, never()).save(any());
             verify(redisTemplate, never()).opsForValue();
@@ -155,8 +180,11 @@ class CreditCoreServiceImplTest {
                     .thenReturn(CustomerConsentDummies.consentWithTermId(REVOKED_TERM_ID, REVOKED_TERM_CODE));
             when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-            underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm());
+            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm());
 
+            assertThat(response).isNotNull();
+            assertThat(response.getConsentReceivedAt()).isNotNull();
+            verify(eventHubPort).sendEvent(any());
             verify(customerConsentRepository, never()).saveConsent(any());
             verify(outboxEventQueueRepository, never()).save(any());
             verify(valueOperations).set("sync_status:" + CUSTOMER_ID, "PROCESSING", MAX_VALIDITY_DAYS, TimeUnit.DAYS);

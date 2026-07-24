@@ -2,16 +2,9 @@
 <!DOCTYPE configuration>
 <configuration>
     <conversionRule conversionWord="clr" class="org.springframework.boot.logging.logback.ColorConverter" />
-    <conversionRule conversionWord="maskedMessage" class="br.com.tlf.logging.MaskingConverter" />
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{yyyy-MM-dd HH:mm:ss} [%X{userId}] [%X{id}] %clr(%-5level) - %msg%n</pattern>
-        </encoder>
-    </appender>
-    <!-- Novo appender customizado -->
-    <appender name="CUSTOM" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%maskedMessage(%msg%n)</pattern>
         </encoder>
     </appender>
     <root level="info">
