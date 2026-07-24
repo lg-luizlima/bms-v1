@@ -8,7 +8,7 @@ import br.com.tlf.infrastructure.persistence.postgresql.entity.CustomerConsentJp
 
 @Mapper(componentModel = "spring")
 public interface CustomerConsentRepositoryMapper {
-    
+
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "cpfHash", source = "customerId")
     CustomerConsentJpaEntity toEntity(CustomerConsentVO consentVO);

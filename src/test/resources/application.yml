@@ -2,9 +2,6 @@ server:
   port: 8082
 
 tlf:
-  logging:
-    enabled: true
-    disable-json-format-in-console: true
   lending: {}
 
 spring:
@@ -28,6 +25,9 @@ spring:
   h2:
     console:
       enabled: true
+  # Flyway targets Postgres-specific SQL (jsonb, etc.) — keep it off against H2.
+  flyway:
+    enabled: false
   security:
     oauth2:
       resourceserver:

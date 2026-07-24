@@ -16,7 +16,7 @@ import br.com.tlf.api.rest.assembler.CreditCoreAssembler;
 import br.com.tlf.api.rest.shared.ResponseDTO;
 import br.com.tlf.core.port.in.creditcore.CreditCorePortIn;
 import br.com.tlf.core.port.in.dto.request.ConsentRequestDTO;
-import br.com.tlf.core.port.in.dto.response.ActiveConsentResponseDTO;
+import br.com.tlf.core.port.in.dto.response.ConsentResponseDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -40,8 +40,9 @@ public class CreditCoreController {
     }
 
     @PostMapping(UrlConstant.CONSENTS_URI)
-    @ResponseStatus(HttpStatus.CREATED)
-    public void createConsent(@RequestHeader String authorization, @RequestBody ConsentRequestDTO request) {
-        creditCoreService.createConsent(authorization, request);
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ResponseDTO createConsent(@RequestHeader String authorization, @RequestBody ConsentRequestDTO request) {
+        ConsentResponseDTO consentResponse = creditCoreService.createConsent(authorization, request);
+        return assembler.toResponseDTO(consentResponse, "success", "Consent options registered successfully.");
     }
 }
