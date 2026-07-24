@@ -7,7 +7,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import br.com.tlf.api.rest.config.exceptionhandler.model.ProblemDetailResponse;
@@ -25,7 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(MissingAuditDataException.class)
-    public ResponseEntity<ProblemDetailResponse> missingAuditDataException(MissingAuditDataException ex, WebRequest request) {
+    public ResponseEntity<ProblemDetailResponse> missingAuditDataException(MissingAuditDataException ex) {
         HttpStatus status = HttpStatus.BAD_REQUEST;
 
         log.error("[ApiExceptionHandler] missing audit data: {}", ex.getMessage());
@@ -43,7 +42,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @ExceptionHandler(InvalidTermException.class)
-    public ResponseEntity<ProblemDetailResponse> invalidTermException(InvalidTermException ex, WebRequest request) {
+    public ResponseEntity<ProblemDetailResponse> invalidTermException(InvalidTermException ex) {
         HttpStatus status = HttpStatus.UNPROCESSABLE_ENTITY;
 
         log.error("[ApiExceptionHandler] invalid term: {}", ex.getMessage());
@@ -61,7 +60,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @ExceptionHandler(MandatoryTermNotAcceptedException.class)
-    public ResponseEntity<ProblemDetailResponse> mandatoryTermNotAcceptedException(MandatoryTermNotAcceptedException ex, WebRequest request) {
+    public ResponseEntity<ProblemDetailResponse> mandatoryTermNotAcceptedException(MandatoryTermNotAcceptedException ex) {
         HttpStatus status = HttpStatus.UNPROCESSABLE_ENTITY;
 
         log.error("[ApiExceptionHandler] mandatory term not accepted: {}", ex.getMessage());
@@ -79,7 +78,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @ExceptionHandler(ProductNotFoundException.class)
-    public ResponseEntity<ProblemDetailResponse> productNotFoundException(ProductNotFoundException ex, WebRequest request) {
+    public ResponseEntity<ProblemDetailResponse> productNotFoundException(ProductNotFoundException ex) {
         HttpStatus status = HttpStatus.BAD_REQUEST;
 
         log.error("[ApiExceptionHandler] product not found: {}", ex.getMessage());
@@ -98,7 +97,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     //Keep this handler as the last one, to catch any unexpected exceptions that may occur in the application
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ProblemDetailResponse> handleUnexpectedException(Exception ex, WebRequest request) {
+    public ResponseEntity<ProblemDetailResponse> handleUnexpectedException(Exception ex) {
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
 
         log.error("[ApiExceptionHandler] unexpected error: {}", ex.getMessage(), ex);

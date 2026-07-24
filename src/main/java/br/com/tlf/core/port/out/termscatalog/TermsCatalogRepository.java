@@ -8,6 +8,3 @@ public interface TermsCatalogRepository {
 
     List<TermsCatalogVO> findLatestActiveByProduct(String product);
 }
-
-
-

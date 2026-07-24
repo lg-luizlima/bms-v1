@@ -1,6 +1,5 @@
 package br.com.tlf.core.port.out.customerconsent;
 
-
 import br.com.tlf.core.domain.vo.terms.CustomerConsentVO;
 
 public interface CustomerConsentRepository {
