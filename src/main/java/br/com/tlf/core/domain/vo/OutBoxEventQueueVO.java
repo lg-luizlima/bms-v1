@@ -20,5 +20,6 @@ public class OutBoxEventQueueVO {
     private String topicName;
     private String payload;
     private Instant createdAt;
+    private String traceContext;
 
 }

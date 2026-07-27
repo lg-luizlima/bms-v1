@@ -15,5 +15,6 @@ public interface OutBoxEventQueueMapper {
     @Mapping(target = "payload", source = "payloadJson")
     @Mapping(target = "aggregateType", constant = AGGREGATE_TYPE)
     @Mapping(target = "topicName", constant = TOPIC_NAME)
-    OutBoxEventQueueVO toVO(String consentId, String payloadJson);
+    @Mapping(target = "traceContext", source = "traceContext")
+    OutBoxEventQueueVO toVO(String consentId, String payloadJson, String traceContext);
 }

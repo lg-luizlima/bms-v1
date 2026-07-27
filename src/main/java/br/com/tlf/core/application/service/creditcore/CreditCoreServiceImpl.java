@@ -3,6 +3,7 @@ package br.com.tlf.core.application.service.creditcore;
 import static br.com.tlf.shared.constants.ApplicationConstants.MAX_VALIDITY_DAYS;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -12,6 +13,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
 
 import br.com.tlf.core.application.mapper.creditcore.CreditCoreMapper;
 import br.com.tlf.core.application.mapper.outboxeventqueue.OutBoxEventQueueMapper;
@@ -53,6 +58,8 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         private final StringRedisTemplate redisTemplate;
         private final EventHubPort eventHubPort;
         private final TransactionTemplate transactionTemplate;
+        private final Tracer tracer;
+        private final Propagator propagator;
         @Value("${features.eventhub.parallel-publish-enabled:true}")
         private boolean eventHubParallelPublishEnabled = true;
 
@@ -165,12 +172,22 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         private void saveConsentAtomically(CustomerConsentVO consent, String cpf) {
                 transactionTemplate.executeWithoutResult(status -> {
                         customerConsentRepository.saveConsent(consent);
-                        // Payload do evento carrega o CPF em claro em customerId (contrato consumido pelo
-                        // ms-vivopay-credit-consent-worker-v1), distinto do hash usado internamente/DB.
+
                         ConsentEventPayloadVO eventPayload = creditCoreMapper.toConsentEventPayloadVO(cpf, consent);
                         outboxEventQueueRepository.save(
-                                        outBoxEventQueueMapper.toVO(consent.getCustomerId(), jsonSerializer.toJson(eventPayload)));
+                                        outBoxEventQueueMapper.toVO(consent.getCustomerId(), jsonSerializer.toJson(eventPayload),
+                                                        currentTraceParent()));
                 });
+        }
+
+        private String currentTraceParent() {
+                Span currentSpan = tracer.currentSpan();
+                if (currentSpan == null) {
+                        return null;
+                }
+                Map<String, String> carrier = new HashMap<>();
+                propagator.inject(currentSpan.context(), carrier, Map::put);
+                return carrier.get("traceparent");
         }
 
         private boolean isTermSigned(TermsCatalogVO term, String cpfToken) {
