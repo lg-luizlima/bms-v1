@@ -38,12 +38,6 @@
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-webflux</artifactId>
-			<scope>compile</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
 			<scope>compile</scope>
 		</dependency>
@@ -181,8 +175,9 @@
 
 		<!-- spring-boot-starter-hateoas removed: pulled in spring-boot-starter-webmvc (Tomcat) transitively
 		     and is otherwise unused — no HATEOAS APIs (EntityModel/WebMvcLinkBuilder/etc.) anywhere in this
-		     codebase. spring-boot-starter-webflux stays regardless (see below) purely to support
-		     WebClientConfiguration's outbound HttpClient/WebClient, not the (blocking) request path. -->
+		     codebase. spring-boot-starter-webflux also removed: WebClientConfiguration's outbound calls now
+		     go through a blocking RestClient (org.apache.hc.client5 HttpComponents), matching the rest of
+		     this app's synchronous request path — no reactive dependency needed. -->
 
 		<!-- PostgreSQL / JPA -->
 
@@ -245,29 +240,10 @@
 			<version>0.11.5</version>
 		</dependency>
 
-		<!-- lib-fintech-log:1.0.21 (a versão publicada na nuvem) usa o construtor de 1 argumento
-		     de ContentCachingRequestWrapper, removido no Spring Web 7 (Boot 4.x) — quebra a
-		     aplicação em runtime com NoSuchMethodError assim que uma requisição HTTP chega
-		     (MyFilter.doFilterInternal). 1.0.23 é uma versão corrigida (bytecode decompilado do jar oficial 1.0.21, já
-		     que o código-fonte não estava disponível neste ambiente — ver
-		     /private/tmp/claude-502/lib-fintech-log-fix/ para o projeto usado na correção):
-		     corrige o construtor de ContentCachingRequestWrapper (Boot 4.x) e adiciona
-		     OpenTelemetry Span Events em MyFilter/WebClientLoggingFilter (mesmo JSON dos logs
-		     API_REQUEST/RESPONSE/INTEGRATION_REQUEST/RESPONSE anexado ao span ativo, para
-		     aparecer na waterfall de trace do Tempo/Jaeger, além do Loki). Instalada apenas no
-		     repositório Maven LOCAL desta máquina (não publicada na nuvem ainda). Assim que o
-		     time responsável publicar a versão real corrigida no Nexus, trocar para a linha
-		     comentada abaixo e remover esta.
 		<dependency>
 			<groupId>br.com.tlf.vvpp</groupId>
 			<artifactId>lib-fintech-log</artifactId>
-			<version>1.0.21</version>
-		</dependency>
-		-->
-		<dependency>
-			<groupId>br.com.tlf.vvpp</groupId>
-			<artifactId>lib-fintech-log</artifactId>
-			<version>1.0.23</version>
+			<version>2.0.1</version>
 		</dependency>
 
 		<!-- Spans CLIENT por conexão/query JDBC (Postgres), no mesmo padrão do que o Spring
