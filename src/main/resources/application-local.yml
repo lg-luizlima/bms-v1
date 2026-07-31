@@ -15,8 +15,9 @@ management:
   logging:
     export:
       otlp:
-        enabled: true
+        enabled: ${OTEL_EXPORTER_OTLP_ENABLED:false}
   opentelemetry:
+    enabled: ${OTEL_EXPORTER_OTLP_ENABLED:false}
     tracing:
       export:
         otlp:
@@ -32,7 +33,7 @@ management:
     metrics:
       export:
         url: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:http://localhost:4318/v1/metrics}
-        enabled: true
+        enabled: ${OTEL_EXPORTER_OTLP_METRICS_ENABLED:true}
 
 tlf:
   lending: {}
