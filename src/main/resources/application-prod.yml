@@ -9,6 +9,8 @@ management:
     web:
       exposure:
         include: health,prometheus
+      path-mapping:
+        health: health
   tracing:
     enabled: ${OTEL_EXPORTER_OTLP_ENABLED:false}
     sampling:
