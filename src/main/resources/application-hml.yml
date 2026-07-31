@@ -9,6 +9,8 @@ management:
     web:
       exposure:
         include: health,prometheus
+      path-mapping:
+        health: health
   tracing:
     sampling:
       probability: ${OTEL_TRACES_SAMPLER_PROBABILITY:1.0}
