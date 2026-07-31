@@ -1,5 +1,6 @@
 package br.com.tlf.shared.observability;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 
 import io.opentelemetry.api.OpenTelemetry;
@@ -10,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 
 @Configuration
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "management.opentelemetry", name = "enabled", havingValue = "true")
 public class OpenTelemetryLoggingConfig {
 
     private final OpenTelemetry openTelemetry;
