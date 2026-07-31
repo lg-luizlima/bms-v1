@@ -229,12 +229,6 @@
 			<version>2.0.2</version>
 		</dependency>
 
-		<dependency>
-			<groupId>net.ttddyy.observation</groupId>
-			<artifactId>datasource-micrometer-spring-boot</artifactId>
-			<version>1.1.1-boot4fix</version>
-		</dependency>
-
 	</dependencies>
 
 	<build>
