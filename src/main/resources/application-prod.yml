@@ -10,9 +10,11 @@ management:
       exposure:
         include: health,prometheus
   tracing:
+    enabled: ${OTEL_EXPORTER_OTLP_ENABLED:false}
     sampling:
       probability: ${OTEL_TRACES_SAMPLER_PROBABILITY:1.0}
   logging:
+    enabled: ${OTEL_EXPORTER_OTLP_ENABLED:false}
     export:
       otlp:
         enabled: ${OTEL_EXPORTER_OTLP_ENABLED:false}
@@ -23,6 +25,7 @@ management:
         otlp:
           endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
     logging:
+      enabled: ${OTEL_EXPORTER_OTLP_ENABLED:false}
       export:
         otlp:
           endpoint: ${OTEL_EXPORTER_OTLP_LOGS_ENDPOINT}
@@ -30,6 +33,7 @@ management:
       service.name: ${spring.application.name}
       deployment.environment: prod
   otlp:
+    enabled: ${OTEL_EXPORTER_OTLP_ENABLED:false}
     metrics:
       export:
         url: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT}
