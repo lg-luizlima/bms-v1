@@ -3,6 +3,8 @@ package br.com.tlf.api.rest.config.exceptionhandler;
 import java.time.Instant;
 import java.util.UUID;
 
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -29,6 +31,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
         log.error("[ApiExceptionHandler] missing audit data: {}", ex.getMessage());
 
+        String stackTrace = ExceptionUtils.getStackTrace(ex);
+        MDC.put("exception", stackTrace.length() > 500 ? stackTrace.substring(0, 500) : stackTrace);
+
         ProblemDetailResponse body = ProblemDetailResponse.builder()
                 .errorCode(DomainErrorCode.MISSING_AUDIT_DATA.getCode())
                 .message("Validation Error")
@@ -46,6 +51,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         HttpStatus status = HttpStatus.UNPROCESSABLE_ENTITY;
 
         log.error("[ApiExceptionHandler] invalid term: {}", ex.getMessage());
+
+        String stackTrace = ExceptionUtils.getStackTrace(ex);
+        MDC.put("exception", stackTrace.length() > 500 ? stackTrace.substring(0, 500) : stackTrace);
 
         ProblemDetailResponse body = ProblemDetailResponse.builder()
                 .errorCode(DomainErrorCode.INVALID_TERM.getCode())
@@ -65,6 +73,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
         log.error("[ApiExceptionHandler] mandatory term not accepted: {}", ex.getMessage());
 
+        String stackTrace = ExceptionUtils.getStackTrace(ex);
+        MDC.put("exception", stackTrace.length() > 500 ? stackTrace.substring(0, 500) : stackTrace);
+
         ProblemDetailResponse body = ProblemDetailResponse.builder()
                 .errorCode(DomainErrorCode.MANDATORY_TERM_NOT_ACCEPTED.getCode())
                 .message("Business Validation Error")
@@ -82,6 +93,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         HttpStatus status = HttpStatus.BAD_REQUEST;
 
         log.error("[ApiExceptionHandler] product not found: {}", ex.getMessage());
+
+        String stackTrace = ExceptionUtils.getStackTrace(ex);
+        MDC.put("exception", stackTrace.length() > 500 ? stackTrace.substring(0, 500) : stackTrace);
 
         ProblemDetailResponse body = ProblemDetailResponse.builder()
                 .errorCode(ex.getErrorCode().getCode())
@@ -101,6 +115,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
 
         log.error("[ApiExceptionHandler] unexpected error: {}", ex.getMessage(), ex);
+
+        String stackTrace = ExceptionUtils.getStackTrace(ex);
+        MDC.put("exception", stackTrace.length() > 500 ? stackTrace.substring(0, 500) : stackTrace);
 
         ProblemDetailResponse body = ProblemDetailResponse.builder()
                 .errorCode(DomainErrorCode.UNEXPECTED_ERROR.getCode())

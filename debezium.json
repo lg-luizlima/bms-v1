@@ -2,6 +2,10 @@
   "name": "credit-consent-outbox-connector",
   "config": {
     "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
     "plugin.name": "pgoutput",
     "database.hostname": "postgres",
     "database.port": "5432",
@@ -21,6 +25,7 @@
     "transforms.outbox.table.field.event.id": "event_id",
     "transforms.outbox.table.field.event.key": "aggregate_id",
     "transforms.outbox.table.field.event.payload": "payload",
-    "transforms.outbox.table.fields.additional.placement": "aggregate_type:header:eventType,aggregate_id:header:aggregateId,created_at:header:createdAt,event_id:header:eventId"
+    "transforms.outbox.table.expand.json.payload": "true",
+    "transforms.outbox.table.fields.additional.placement": "aggregate_type:header:eventType,aggregate_id:header:aggregateId,created_at:header:createdAt,event_id:header:eventId,trace_context:header:traceparent"
   }
 }

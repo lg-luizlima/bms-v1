@@ -12,7 +12,7 @@
 
 	<artifactId>ms-vivopay-credit-consent-bms-v1</artifactId>
 
-	<version>homolog-3ab8caa7</version>
+	<version>homolog-5c11fcc8</version>
 
 	<name>ms-vivopay-credit-consent-bms-v1</name>
 
@@ -34,12 +34,6 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-json</artifactId>
-		</dependency>
-
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-webflux</artifactId>
-			<scope>compile</scope>
 		</dependency>
 
 		<dependency>
@@ -95,6 +89,43 @@
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 
+		<!-- Observabilidade (OpenTelemetry): Micrometer Tracing (bridge OTel) + export OTLP de
+		     traces/métricas, tudo gerenciado pela BOM spring-boot-dependencies herdada via
+		     lib-java-spring-parent-starter — sem <version>, diferente do resilience4j. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-opentelemetry</artifactId>
+		</dependency>
+
+		<!-- Registry Prometheus para expor /actuator/prometheus (scrape local) — sem <version>,
+		     gerenciado pelo micrometer-bom importado por spring-boot-dependencies. -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-registry-prometheus</artifactId>
+		</dependency>
+
+		<!-- Appender Logback -> OTel logs (correlação log/trace no Loki via Collector).
+		     Não gerenciado pela BOM do Boot — versão pinada explicitamente, como o resilience4j.
+		     opentelemetry-api-incubator excluído e repinado abaixo: a versão transitiva
+		     (1.55.0-alpha) é incompatível em bytecode com o opentelemetry-sdk:1.62.0 que o
+		     Boot já traz (NoSuchMethodError em DeclarativeConfigProperties.get). -->
+		<dependency>
+			<groupId>io.opentelemetry.instrumentation</groupId>
+			<artifactId>opentelemetry-logback-appender-1.0</artifactId>
+			<version>2.21.0-alpha</version>
+			<exclusions>
+				<exclusion>
+					<groupId>io.opentelemetry</groupId>
+					<artifactId>opentelemetry-api-incubator</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>io.opentelemetry</groupId>
+			<artifactId>opentelemetry-api-incubator</artifactId>
+			<version>1.62.0-alpha</version>
+		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
@@ -144,8 +175,9 @@
 
 		<!-- spring-boot-starter-hateoas removed: pulled in spring-boot-starter-webmvc (Tomcat) transitively
 		     and is otherwise unused — no HATEOAS APIs (EntityModel/WebMvcLinkBuilder/etc.) anywhere in this
-		     codebase. spring-boot-starter-webflux stays regardless (see below) purely to support
-		     WebClientConfiguration's outbound HttpClient/WebClient, not the (blocking) request path. -->
+		     codebase. spring-boot-starter-webflux also removed: WebClientConfiguration's outbound calls now
+		     go through a blocking RestClient (org.apache.hc.client5 HttpComponents), matching the rest of
+		     this app's synchronous request path — no reactive dependency needed. -->
 
 		<!-- PostgreSQL / JPA -->
 
@@ -206,6 +238,33 @@
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
 			<version>0.11.5</version>
+		</dependency>
+
+		<dependency>
+			<groupId>br.com.tlf.vvpp</groupId>
+			<artifactId>lib-fintech-log</artifactId>
+			<version>2.0.1</version>
+		</dependency>
+
+		<!-- Spans CLIENT por conexão/query JDBC (Postgres), no mesmo padrão do que o Spring
+		     Data Redis já faz sozinho para o Lettuce. O jar oficial 1.1.1 (Maven Central) visa
+		     Boot 3.4.x: DataSourceObservationAutoConfiguration referencia 4 classes que
+		     mudaram de pacote no module-split do Boot 4 (ObservationAutoConfiguration,
+		     ObservationRegistryCustomizer, MicrometerTracingAutoConfiguration,
+		     DataSourceAutoConfiguration) e usa @ConditionalOnEnabledTracing, removida sem
+		     substituto no Boot 4 — NoClassDefFoundError/ClassNotFoundException ao subir a
+		     aplicação. 1.1.1-boot4fix corrige só essa classe (recompilada com os pacotes certos
+		     do Boot 4.1.0, anotação removida — redundante nesta stack, tracing sempre
+		     habilitado), resto do jar oficial idêntico (só as 5 classes de
+		     DataSourceObservationAutoConfiguration/nested foram recompiladas e substituídas no
+		     jar, via decompilação CFR — mesmo processo usado para o fix do lib-fintech-log).
+		     Instalada apenas no repositório Maven LOCAL desta máquina. Quando o projeto
+		     jdbc-observations publicar uma versão com suporte a Boot 4.x, trocar para a versão
+		     real. -->
+		<dependency>
+			<groupId>net.ttddyy.observation</groupId>
+			<artifactId>datasource-micrometer-spring-boot</artifactId>
+			<version>1.1.1-boot4fix</version>
 		</dependency>
 
 	</dependencies>

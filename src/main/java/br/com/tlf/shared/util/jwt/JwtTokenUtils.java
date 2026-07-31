@@ -2,7 +2,6 @@ package br.com.tlf.shared.util.jwt;
 
 
 import com.auth0.jwt.JWT;
-import com.auth0.jwt.exceptions.JWTDecodeException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -70,34 +69,39 @@ public class JwtTokenUtils {
         return null;
     }
 
+
     private static String decodeJwt(String token) throws JsonProcessingException {
 
         if (Objects.isNull(token)) {
             throw new TokenNullException("Authorization is mandatory");
         }
 
-        if (token.startsWith("Bearer")) {
-            token = token.substring(7);
-        }
-
         DecodedJWT jwt;
         try {
+
+            if (token.startsWith("Bearer")) {
+                token = token.substring(7);
+            }
+
             jwt = JWT.decode(token);
-        } catch (JWTDecodeException e) {
+
+            var claims = jwt.getClaims();
+            var claimsMap = new HashMap<>();
+
+            claims.forEach((key, value) -> claimsMap.put(key, value.as(Object.class)));
+
+            var mapper = new ObjectMapper();
+            var jsonString = mapper.writeValueAsString(claimsMap);
+
+            var rootNode = mapper.readTree(jsonString);
+            var idNode = rootNode.path("cpf");
+
+            return idNode.asText();
+
+        } catch (Exception e) {
             throw new InvalidTokenException("Invalid JWT format");
         }
-        var claims = jwt.getClaims();
-        var claimsMap = new HashMap<>();
 
-        claims.forEach((key, value) -> claimsMap.put(key, value.as(Object.class)));
-
-        var mapper = new ObjectMapper();
-        var jsonString = mapper.writeValueAsString(claimsMap);
-
-        var rootNode = mapper.readTree(jsonString);
-        var idNode = rootNode.path("cpf");
-
-        return idNode.asText();
     }
 
     private Key getSigningKey(String encodedString) {

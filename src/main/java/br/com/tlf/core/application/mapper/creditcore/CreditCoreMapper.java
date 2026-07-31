@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import br.com.tlf.core.domain.vo.consent.AcceptedTermVO;
 import br.com.tlf.core.domain.vo.consent.ConsentRequestVO;
 import br.com.tlf.core.domain.vo.terms.ActiveConsentResponseVO;
+import br.com.tlf.core.domain.vo.terms.ConsentEventPayloadVO;
 import br.com.tlf.core.domain.vo.terms.CustomerConsentVO;
 import br.com.tlf.core.domain.vo.terms.PendingTermVO;
 import br.com.tlf.core.domain.vo.terms.TermsCatalogVO;
@@ -49,6 +50,12 @@ public interface CreditCoreMapper {
     @Mapping(target = "expiresAt", expression = "java(calculateExpiresAt(termCatalog))")
     @Mapping(target = "auditDetails", expression = "java(serializeAuditDetails(consentRequestVO))")
     CustomerConsentVO toCustomerConsentVO(String cpfToken, ConsentRequestVO consentRequestVO, AcceptedTermVO acceptedTerm, TermsCatalogVO termCatalog);
+
+    @Mapping(target = "customerId", source = "cpf")
+    @Mapping(target = "termCode", source = "consent.termCode")
+    @Mapping(target = "termId", source = "consent.termId")
+    @Mapping(target = "optIn", source = "consent.optIn")
+    ConsentEventPayloadVO toConsentEventPayloadVO(String cpf, CustomerConsentVO consent);
 
     default Instant calculateExpiresAt(TermsCatalogVO termCatalog) {
         long days = termCatalog.getValidityDays() != null

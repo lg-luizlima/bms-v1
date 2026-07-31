@@ -3,6 +3,7 @@ package br.com.tlf.core.application.service.creditcore;
 import static br.com.tlf.shared.constants.ApplicationConstants.MAX_VALIDITY_DAYS;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -13,6 +14,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
+
 import br.com.tlf.core.application.mapper.creditcore.CreditCoreMapper;
 import br.com.tlf.core.application.mapper.outboxeventqueue.OutBoxEventQueueMapper;
 import br.com.tlf.core.domain.exception.InvalidTermException;
@@ -21,6 +26,7 @@ import br.com.tlf.core.domain.exception.ProductNotFoundException;
 import br.com.tlf.core.domain.vo.consent.AcceptedTermVO;
 import br.com.tlf.core.domain.vo.consent.ConsentRequestVO;
 import br.com.tlf.core.domain.vo.terms.ActiveConsentResponseVO;
+import br.com.tlf.core.domain.vo.terms.ConsentEventPayloadVO;
 import br.com.tlf.core.domain.vo.terms.CustomerConsentVO;
 import br.com.tlf.core.domain.vo.terms.TermsCatalogVO;
 import br.com.tlf.core.port.in.creditcore.CreditCorePortIn;
@@ -52,6 +58,8 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         private final StringRedisTemplate redisTemplate;
         private final EventHubPort eventHubPort;
         private final TransactionTemplate transactionTemplate;
+        private final Tracer tracer;
+        private final Propagator propagator;
         @Value("${features.eventhub.parallel-publish-enabled:true}")
         private boolean eventHubParallelPublishEnabled = true;
 
@@ -60,7 +68,8 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
 
                 publishEventHubIfEnabled(requestDTO);
 
-                String customerId = HmacUtils.generateHmacSha256(JwtTokenUtils.cpfToken(authorization));
+                String cpf = JwtTokenUtils.cpfToken(authorization);
+                String customerId = HmacUtils.generateHmacSha256(cpf);
 
                 log.info("createConsent - customerId: {}, product: {}, acceptedTerms: {}", customerId, requestDTO.getProduct(), requestDTO.getAcceptedTerms());
 
@@ -71,7 +80,7 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
 
                 validateMandatoryTerms(latestActiveByProduct, consentRequestVO.getAcceptedTerms(), customerId);
 
-                processAcceptedTerms(customerId, consentRequestVO, latestActiveByProduct);
+                processAcceptedTerms(cpf, customerId, consentRequestVO, latestActiveByProduct);
 
                 redisTemplate.opsForValue().set(
                                 "sync_status:" + consentRequestVO.getCustomerId(),
@@ -96,7 +105,7 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                                 .build());
         }
 
-        private void processAcceptedTerms(String cpfToken, ConsentRequestVO consentRequestVO,
+        private void processAcceptedTerms(String cpf, String cpfToken, ConsentRequestVO consentRequestVO,
                         List<TermsCatalogVO> latestActiveByProduct) {
                 Map<String, TermsCatalogVO> catalogMap = latestActiveByProduct.stream()
                                 .collect(Collectors.toMap(
@@ -121,7 +130,7 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                         if (!isTermSigned(catalogTerm, cpfToken)) {
                                 log.info("[createConsent] Saving consent for customerId: {}, termCode: {}, termId: {}", cpfToken, acceptedTerm.getTermCode(), catalogTerm.getId());
                                 CustomerConsentVO consent = creditCoreMapper.toCustomerConsentVO(cpfToken, consentRequestVO, acceptedTerm, catalogTerm);
-                                saveConsentAtomically(consent);
+                                saveConsentAtomically(consent, cpf);
                         }else{
                                 log.info("[createConsent] Term already signed for customerId: {}, termCode: {}, termId: {}", cpfToken, acceptedTerm.getTermCode(), catalogTerm.getId());
                         }
@@ -160,12 +169,25 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                 return creditCoreMapper.toActiveConsentResponseDTO(build);
         }
 
-        private void saveConsentAtomically(CustomerConsentVO consent) {
+        private void saveConsentAtomically(CustomerConsentVO consent, String cpf) {
                 transactionTemplate.executeWithoutResult(status -> {
                         customerConsentRepository.saveConsent(consent);
+
+                        ConsentEventPayloadVO eventPayload = creditCoreMapper.toConsentEventPayloadVO(cpf, consent);
                         outboxEventQueueRepository.save(
-                                        outBoxEventQueueMapper.toVO(consent.getCustomerId(), jsonSerializer.toJson(consent)));
+                                        outBoxEventQueueMapper.toVO(consent.getCustomerId(), jsonSerializer.toJson(eventPayload),
+                                                        currentTraceParent()));
                 });
+        }
+
+        private String currentTraceParent() {
+                Span currentSpan = tracer.currentSpan();
+                if (currentSpan == null) {
+                        return null;
+                }
+                Map<String, String> carrier = new HashMap<>();
+                propagator.inject(currentSpan.context(), carrier, Map::put);
+                return carrier.get("traceparent");
         }
 
         private boolean isTermSigned(TermsCatalogVO term, String cpfToken) {

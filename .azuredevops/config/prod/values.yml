@@ -42,6 +42,9 @@ ingress:
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
       grpc_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "5"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
   hosts:
     - host: ms-vivopay-credit-consent-bms-v1.private.prod
       paths: 

@@ -18,6 +18,17 @@ services:
     ports:
       - "6379:6379"
 
+  redis-insight:
+    image: redislabs/redisinsight:1.14.0
+    container_name: redis_insight
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    volumes:
+      - redis_insight_volume_data:/db
+    depends_on:
+      - redis
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: pgadmin
@@ -141,3 +152,76 @@ services:
           --data @/tmp/debezium.json \
           http://debezium:8083/connectors;
         echo "Connector registered.";
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.113.0
+    container_name: otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317" # OTLP gRPC — as 3 apps apontam OTEL_EXPORTER_OTLP_ENDPOINT para cá
+      - "4318:4318" # OTLP HTTP
+    depends_on:
+      - tempo
+      - jaeger
+      - loki
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200" # API de consulta do Tempo (usada pelo datasource do Grafana)
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    container_name: jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # UI/API do Jaeger
+      - "4319:4317"   # porta remapeada no host — 4317 já é usado pelo otel-collector
+
+  loki:
+    image: grafana/loki:3.1.0
+    container_name: loki
+    command: ["-config.file=/etc/loki/loki-config.yaml"]
+    volumes:
+      - ./loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100" # API do Loki (query + ingestão OTLP nativa em /otlp/v1/logs)
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # scrape das 3 apps rodando no host (fora do compose)
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - tempo
+      - loki
+      - prometheus
+
+volumes:
+  tempo_data:
+  redis_insight_volume_data:
+  loki_data:

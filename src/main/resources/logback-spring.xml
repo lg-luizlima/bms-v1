@@ -2,17 +2,73 @@
 <!DOCTYPE configuration>
 <configuration>
     <conversionRule conversionWord="clr" class="org.springframework.boot.logging.logback.ColorConverter" />
+    <conversionRule conversionWord="maskedMessage" class="br.com.tlf.logging.MaskingConverter" />
+
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%X{userId}] [%X{id}] %clr(%-5level) - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%X{userId}] [%X{id}] [%X{traceId}-%X{spanId}] %clr(%-5level) - %msg%n</pattern>
         </encoder>
     </appender>
-    <root level="info">
+
+    <!-- Logs estruturados (JSON) de API_REQUEST/API_RESPONSE/INTEGRATION_REQUEST/
+         INTEGRATION_RESPONSE, com mascaramento de campos sensíveis (logging.sensitive.*). -->
+    <appender name="CUSTOM" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%maskedMessage(%msg%n)</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Encaminha os eventos de log para o OTel SDK (bridge instalado em
+         OpenTelemetryLoggingConfig), exportados via OTLP para o Collector -> Loki,
+         correlacionados por trace_id/span_id com os spans da mesma requisição. -->
+    <appender name="OpenTelemetry" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+        <captureExperimentalAttributes>true</captureExperimentalAttributes>
+        <captureCodeAttributes>true</captureCodeAttributes>
+        <captureMarkerAttribute>true</captureMarkerAttribute>
+        <captureKeyValuePairAttributes>true</captureKeyValuePairAttributes>
+        <captureLoggerContext>true</captureLoggerContext>
+        <captureMdcAttributes>*</captureMdcAttributes>
+    </appender>
+
+    <!-- Async em todos os appenders: a thread que gera o log nunca bloqueia (neverBlock),
+         mesmo sob volume alto de chamadas/payloads grandes — ao custo de poder descartar
+         logs se a fila (8192) encher (discardingThreshold=0 prioriza não bloquear sobre
+         garantir 100% de entrega). -->
+    <appender name="ASYNC_STDOUT" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>8192</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
         <appender-ref ref="STDOUT" />
+    </appender>
+
+    <appender name="ASYNC_CUSTOM" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>8192</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="CUSTOM" />
+    </appender>
+
+    <appender name="ASYNC_OTEL" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>8192</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="OpenTelemetry" />
+    </appender>
+
+    <root level="info">
+        <appender-ref ref="ASYNC_STDOUT" />
+        <appender-ref ref="ASYNC_OTEL" />
     </root>
+
     <!-- Logger customizado -->
     <logger name="br.com.tlf.domain.util.LogUtils" level="DEBUG" additivity="false">
-        <appender-ref ref="STDOUT" />
+        <appender-ref ref="ASYNC_STDOUT" />
+        <appender-ref ref="ASYNC_OTEL" />
     </logger>
 
+    <!-- customLogger: usado por MyFilter (API_REQUEST/RESPONSE) para os logs estruturados. -->
+    <logger name="customLogger" level="DEBUG" additivity="false">
+        <appender-ref ref="ASYNC_CUSTOM" />
+        <appender-ref ref="ASYNC_OTEL" />
+    </logger>
 </configuration>

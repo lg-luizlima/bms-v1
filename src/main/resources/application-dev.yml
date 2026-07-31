@@ -5,13 +5,49 @@ management:
   endpoint:
     health:
       enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  tracing:
+    sampling:
+      probability: ${OTEL_TRACES_SAMPLER_PROBABILITY:1.0}
+  logging:
+    export:
+      otlp:
+        enabled: true
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+    logging:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_LOGS_ENDPOINT}
+    resource-attributes:
+      service.name: ${spring.application.name}
+      deployment.environment: dev
+  otlp:
+    metrics:
+      export:
+        url: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT}
+        enabled: true
 
 tlf:
   lending: {}
+  logging:
+    enabled: true
+    disable-json-format-in-console: true
+
+logging:
+  sensitive:
+    fields: ${LOGGING_SENSITIVE_FIELDS:password,senha,access_token,accessToken,Authorization}
+    mask-enabled: ${LOGGING_MASK_ENABLED:true}
 
 spring:
   application:
-    name: core-architecture-ri
+    name: ms-vivopay-credit-consent-bms
   datasource:
     url: ${BMS_DATABASE_URL}
     username: ${BMS_DATABASE_USERNAME}
@@ -38,7 +74,14 @@ spring:
   data:
     redis:
       host: ${BMS_REDIS_HOST}
+      port: ${BMS_REDIS_PORT}
+      password: ${BMS_REDIS_PASSWORD}
   thread-executor: virtual
+# include jdbc in otel tracing
+jdbc:
+  includes: query
+  datasource-proxy:
+    include-parameter-values: true
 
 azure:
   eventhub:

@@ -59,6 +59,8 @@ import br.com.tlf.dummies.CustomerConsentDummies;
 import br.com.tlf.shared.util.HmacUtils;
 import br.com.tlf.shared.util.JsonSerializer;
 import br.com.tlf.shared.util.jwt.JwtTokenUtils;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
 
 @ExtendWith(MockitoExtension.class)
 class CreditCoreServiceImplTest {
@@ -73,6 +75,8 @@ class CreditCoreServiceImplTest {
     @Mock private ValueOperations<String, String> valueOperations;
     @Mock private EventHubPort eventHubPort;
     @Mock private TransactionTemplate transactionTemplate;
+    @Mock private Tracer tracer;
+    @Mock private Propagator propagator;
 
     @InjectMocks
     private CreditCoreServiceImpl underTest;
@@ -116,7 +120,7 @@ class CreditCoreServiceImplTest {
                     eq(ConsentRequestDummies.acceptedRevokedTermVO()), eq(revokedTerm)))
                     .thenReturn(consentVO);
             when(jsonSerializer.toJson(any())).thenReturn("{}");
-            when(outBoxEventQueueMapper.toVO(eq(CUSTOMER_ID), any()))
+            when(outBoxEventQueueMapper.toVO(eq(CUSTOMER_ID), any(), any()))
                     .thenReturn(outboxVO);
             when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
