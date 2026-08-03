@@ -42,9 +42,7 @@ ingress:
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
       grpc_set_header l5d-dst-override $service_name.$namespace.svc.cluster.local:$service_port;
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "5"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+
   hosts:
     - host: ms-vivopay-credit-consent-bms-v1.private.test
       paths: 
@@ -168,6 +166,8 @@ tolerations: []
 affinity: {}
 
 # See https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+# NOTE: usa o grupo dedicado de liveness (não o /actuator/health agregado) para que uma
+# instabilidade passageira de DB/Redis derrube só a readiness, não reinicie o pod.
 liveness:
   enabled: true
   failureThreshold: 3
@@ -175,17 +175,27 @@ liveness:
   periodSeconds: 10
   successThreshold: 1
   timeoutSeconds: 220
-  healthCheck: /actuator/health
+  healthCheck: /actuator/health/liveness
 
 # See https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 readiness:
   enabled: true
   failureThreshold: 3
-  initialDelaySeconds: 60
+  initialDelaySeconds: 120
   periodSeconds: 10
   successThreshold: 1
   timeoutSeconds: 220
-  healthCheck: /actuator/health
+  healthCheck: /actuator/health/readiness
+
+# See https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+# Dá uma janela de carência para o Flyway/migrations rodarem no boot antes que a liveness
+# comece a contar — CONFIRMAR se o chart generic-java-microservice (repo externo
+# DevOps/Vivo.CodePlay.Pipelines) realmente consome esta chave antes de depender dela.
+startupProbe:
+  enabled: true
+  failureThreshold: 30
+  periodSeconds: 10
+  healthCheck: /actuator/health/readiness
 
 ####################################################################################################################
 #                                          MICROSERVICE SECTION                                                    #
