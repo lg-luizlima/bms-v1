@@ -70,6 +70,7 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: ${spring.datasource.schema}
   flyway:
     enabled: true
     url: ${BMS_DATABASE_URL:${spring.datasource.base-url}?currentSchema=${spring.datasource.schema}}

@@ -66,6 +66,7 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: ${spring.datasource.schema}
     show-sql: true
   flyway:
     enabled: true
