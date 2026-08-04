@@ -17,9 +17,9 @@ management:
   logging:
     export:
       otlp:
-        enabled: ${OTEL_EXPORTER_OTLP_ENABLED:false}
+        enabled: ${OTEL_EXPORTER_OTLP_ENABLED:true}
   opentelemetry:
-    enabled: ${OTEL_EXPORTER_OTLP_ENABLED:false}
+    enabled: ${OTEL_EXPORTER_OTLP_ENABLED:true}
     tracing:
       export:
         otlp:
@@ -46,7 +46,7 @@ tlf:
 logging:
   sensitive:
     fields: ${LOGGING_SENSITIVE_FIELDS:password,senha,access_token,accessToken,Authorization}
-    mask-enabled: ${LOGGING_MASK_ENABLED:true}
+    mask-enabled: ${LOGGING_MASK_ENABLED:false}
 
 spring:
   application:
