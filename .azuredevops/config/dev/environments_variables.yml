@@ -6,3 +6,5 @@ env:
   value: 64m
 - name: JAVA_OPTS_METASPACE_MAX
   value: 128m
+- name: BMS_DATABASE_SCHEMA
+  value: credit_consent

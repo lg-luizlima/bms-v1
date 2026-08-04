@@ -59,6 +59,7 @@ spring:
     password: ${BMS_DATABASE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
       naming:

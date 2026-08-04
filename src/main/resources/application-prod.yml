@@ -33,7 +33,7 @@ management:
           endpoint: ${OTEL_EXPORTER_OTLP_LOGS_ENDPOINT}
     resource-attributes:
       service.name: ${spring.application.name}
-      deployment.environment: prod
+      deployment.environment: hml
   otlp:
     enabled: ${OTEL_EXPORTER_OTLP_ENABLED:false}
     metrics:
@@ -56,13 +56,14 @@ spring:
   application:
     name: ms-vivopay-credit-consent-bms
   datasource:
-    base-url: ${BMS_DATABASE_BASE_URL}
-    schema: ${BMS_DATABASE_SCHEMA:credit_consent}
-    url: ${BMS_DATABASE_URL:${spring.datasource.base-url}?currentSchema=${spring.datasource.schema}}
+    base-url: ${BMS_DATABASE_URL}
+    schema: ${BMS_DATABASE_SCHEMA}
+    url: ${spring.datasource.base-url}?currentSchema=${spring.datasource.schema}
     username: ${BMS_DATABASE_USERNAME}
     password: ${BMS_DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
       naming:
@@ -70,16 +71,12 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        default_schema: ${spring.datasource.schema}
+      default_schema: ${spring.datasource.schema}
+
   flyway:
     enabled: true
-    url: ${BMS_DATABASE_URL:${spring.datasource.base-url}?currentSchema=${spring.datasource.schema}}
-    user: ${BMS_DATABASE_USERNAME}
-    password: ${BMS_DATABASE_PASSWORD}
-    schemas: ${BMS_DATABASE_SCHEMA:credit_consent}
+    schemas: ${BMS_DATABASE_SCHEMA}
     create-schemas: true
-    baseline-on-migrate: true
-    baseline-version: 0
     locations: classpath:db/migration
   data:
     redis:
@@ -88,9 +85,10 @@ spring:
       password: ${BMS_REDIS_PASSWORD}
   thread-executor: virtual
 jdbc:
-  includes: query
+  includes: connection,query
   datasource-proxy:
-    include-parameter-values: false
+    include-parameter-values: true
+
 azure:
   eventhub:
     connection-string: ${EVENTHUB_CONNECTION_STRING}
