@@ -50,7 +50,7 @@ tlf:
 logging:
   sensitive:
     fields: ${LOGGING_SENSITIVE_FIELDS:password,senha,access_token,accessToken,Authorization}
-    mask-enabled: ${LOGGING_MASK_ENABLED:true}
+    mask-enabled: ${LOGGING_MASK_ENABLED:false}
 
 spring:
   application:
