@@ -17,7 +17,11 @@ spec:
     config:
       producer.bootstrap.servers: ${DEBEZIUM_BOOTSTRAP_SERVERS}
       producer.key.serializer: org.apache.kafka.common.serialization.StringSerializer
-      producer.value.serializer: org.apache.kafka.common.serialization.StringSerializer
+      producer.value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+      producer.schema.registry.url: ${DEBEZIUM_SCHEMA_REGISTRY_URL}
+      producer.basic.auth.credentials.source: USER_INFO
+      producer.basic.auth.user.info: ${DEBEZIUM_SCHEMA_REGISTRY_KEY}:${DEBEZIUM_SCHEMA_REGISTRY_SECRET}
+      producer.auto.register.schemas: "true"
       producer.security.protocol: SASL_SSL
       producer.sasl.mechanism: PLAIN
       producer.sasl.jaas.config: >
@@ -54,4 +58,4 @@ spec:
     key:
       type: json
     value:
-      type: json
+      type: avro

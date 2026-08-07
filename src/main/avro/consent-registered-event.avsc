@@ -1,0 +1,12 @@
+{
+  "type": "record",
+  "name": "ConsentRegisteredEvent",
+  "namespace": "br.com.tlf.avro.consent",
+  "doc": "Value schema for topic vivopay.credit.consent.events.v1. Canonical source: ms-vivopay-credit-consent-bms-v1/src/main/avro/consent-registered-event.avsc — mirrors ConsentEventPayloadVO. Copied verbatim into ms-vivopay-credit-consent-worker-v1 for avro-maven-plugin codegen; keep both files byte-identical.",
+  "fields": [
+    { "name": "customerId", "type": "string" },
+    { "name": "termCode", "type": "string" },
+    { "name": "termId", "type": "string", "doc": "UUID serialized as string, matching ConsentEventPayloadVO.termId." },
+    { "name": "optIn", "type": "boolean" }
+  ]
+}

@@ -150,9 +150,9 @@ Default profile is `local`. Production profiles (`dev`, `hml`, `prod`) require:
 
 | Variable | Purpose |
 |----------|---------|
-| `BMS_DATABASE_URL` | PostgreSQL JDBC URL — used by both JPA (runtime) and Flyway (bootstrap migration) |
-| `BMS_DATABASE_USERNAME` | DB username |
-| `BMS_DATABASE_PASSWORD` | DB password |
+| `DATABASE_URL` | PostgreSQL JDBC URL — used by both JPA (runtime) and Flyway (bootstrap migration) |
+| `DATABASE_USERNAME` | DB username |
+| `DATABASE_PASSWORD` | DB password |
 | `EUREKA_REGISTER_URL` | Service discovery |
 | `SPRING_PROFILES_ACTIVE` | Active profile |
 | `EVENTHUB_CONNECTION_STRING` | Azure Event Hub connection |
