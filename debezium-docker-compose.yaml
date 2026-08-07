@@ -98,12 +98,15 @@ services:
       KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
 
   debezium:
-    image: debezium/connect:2.7.0.Final
+    build:
+      context: ./debezium
+    image: ms-vivopay-credit-consent-debezium-avro:2.7.0.Final
     container_name: debezium
     hostname: debezium
     depends_on:
       - kafka
       - postgres
+      - schema-registry
     ports:
       - "8083:8083"
     volumes:
