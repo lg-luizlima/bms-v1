@@ -32,6 +32,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -56,9 +57,11 @@ import br.com.tlf.core.port.out.termscatalog.TermsCatalogRepository;
 import br.com.tlf.dummies.ConsentRequestDummies;
 import br.com.tlf.dummies.CreditTermDummies;
 import br.com.tlf.dummies.CustomerConsentDummies;
+import br.com.tlf.shared.observability.ObservabilityPiiProperties;
 import br.com.tlf.shared.util.HmacUtils;
 import br.com.tlf.shared.util.JsonSerializer;
 import br.com.tlf.shared.util.jwt.JwtTokenUtils;
+import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.Tracer;
 import io.micrometer.tracing.propagation.Propagator;
 
@@ -77,6 +80,10 @@ class CreditCoreServiceImplTest {
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private Tracer tracer;
     @Mock private Propagator propagator;
+    // Registro real (sem listeners) em vez de mock: Observation.createNotStarted(...) acessa
+    // observationConfig() internamente, o que um mock não-stubado não suportaria sem NPE.
+    @Spy private ObservationRegistry observationRegistry = ObservationRegistry.create();
+    @Spy private ObservabilityPiiProperties observabilityPiiProperties = new ObservabilityPiiProperties();
 
     @InjectMocks
     private CreditCoreServiceImpl underTest;

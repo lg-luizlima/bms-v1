@@ -33,7 +33,7 @@ management:
           endpoint: ${OTEL_EXPORTER_OTLP_LOGS_ENDPOINT}
     resource-attributes:
       service.name: ${spring.application.name}
-      deployment.environment: hml
+      deployment.environment: prod
   otlp:
     enabled: ${OTEL_EXPORTER_OTLP_ENABLED:false}
     metrics:
@@ -87,7 +87,17 @@ spring:
 jdbc:
   includes: connection,query
   datasource-proxy:
-    include-parameter-values: true
+    include-parameter-values: ${JDBC_INCLUDE_PARAMETER_VALUES:false}
+  opentelemetry:
+    analysis:
+      sanitize:
+        enabled: ${JDBC_SANITIZE_QUERY_TEXT:true}
+
+observability:
+  pii:
+    redis-values-enabled: ${OBSERVABILITY_PII_REDIS_VALUES:false}
+  noise-reduction:
+    health-endpoints-enabled: ${OTEL_HEALTH_ENDPOINTS_ENABLED:false}
 
 azure:
   eventhub:

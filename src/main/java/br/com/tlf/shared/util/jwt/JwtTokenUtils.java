@@ -94,7 +94,17 @@ public class JwtTokenUtils {
             var jsonString = mapper.writeValueAsString(claimsMap);
 
             var rootNode = mapper.readTree(jsonString);
-            var idNode = rootNode.path("cpf");
+
+            // O JWT real do IdP da Vivo carrega o CPF em "nrdocumento" (confirmado contra token
+            // real de HML), não "cpf". "sub" também carrega o CPF nesse mesmo token. "cpf" fica
+            // como último fallback por compatibilidade, mas não é a claim real do IdP.
+            var idNode = rootNode.path("nrdocumento");
+            if (idNode.isMissingNode() || idNode.asText().isBlank()) {
+                idNode = rootNode.path("sub");
+            }
+            if (idNode.isMissingNode() || idNode.asText().isBlank()) {
+                idNode = rootNode.path("cpf");
+            }
 
             return idNode.asText();
 

@@ -17,6 +17,8 @@ import br.com.tlf.core.domain.exception.InvalidTermException;
 import br.com.tlf.core.domain.exception.MandatoryTermNotAcceptedException;
 import br.com.tlf.core.domain.exception.MissingAuditDataException;
 import br.com.tlf.core.domain.exception.ProductNotFoundException;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -24,6 +26,13 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
+
+    private final Tracer tracer;
+
+    private String currentTraceId() {
+        Span currentSpan = tracer.currentSpan();
+        return currentSpan != null ? currentSpan.context().traceId() : UUID.randomUUID().toString();
+    }
 
     @ExceptionHandler(MissingAuditDataException.class)
     public ResponseEntity<ProblemDetailResponse> missingAuditDataException(MissingAuditDataException ex) {
@@ -39,7 +48,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .message("Validation Error")
                 .details("A assinatura de auditoria requer os dados do dispositivo (IP, DeviceId).")
                 .timestamp(Instant.now().toString())
-                .traceId(UUID.randomUUID().toString())
+                .traceId(currentTraceId())
                 .errors(ex.getErrors())
                 .build();
 
@@ -60,7 +69,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .message("Business Validation Error")
                 .details(ex.getMessage())
                 .timestamp(Instant.now().toString())
-                .traceId(UUID.randomUUID().toString())
+                .traceId(currentTraceId())
                 .errors(ex.getErrors())
                 .build();
 
@@ -81,7 +90,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .message("Business Validation Error")
                 .details(ex.getMessage())
                 .timestamp(Instant.now().toString())
-                .traceId(UUID.randomUUID().toString())
+                .traceId(currentTraceId())
                 .errors(ex.getErrors())
                 .build();
 
@@ -102,7 +111,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .message("Business Validation Error")
                 .details(ex.getMessage())
                 .timestamp(Instant.now().toString())
-                .traceId(UUID.randomUUID().toString())
+                .traceId(currentTraceId())
                 .errors(ex.getErrors())
                 .build();
 
@@ -124,7 +133,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .message("Internal Server Error")
                 .details("An unexpected error occurred. Please try again later.")
                 .timestamp(Instant.now().toString())
-                .traceId(UUID.randomUUID().toString())
+                .traceId(currentTraceId())
                 .errors(null)
                 .build();
 

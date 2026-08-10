@@ -22,6 +22,7 @@
          OpenTelemetryLoggingConfig), exportados via OTLP para o Collector -> Loki,
          correlacionados por trace_id/span_id com os spans da mesma requisição. -->
     <appender name="OpenTelemetry" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+        <filter class="br.com.tlf.shared.observability.OtelNoiseReductionLogFilter" />
         <captureExperimentalAttributes>true</captureExperimentalAttributes>
         <captureCodeAttributes>true</captureCodeAttributes>
         <captureMarkerAttribute>true</captureMarkerAttribute>
