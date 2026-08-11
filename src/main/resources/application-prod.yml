@@ -89,7 +89,7 @@ spring:
 jdbc:
   includes: connection,query
   datasource-proxy:
-    include-parameter-values: ${JDBC_INCLUDE_PARAMETER_VALUES:false}
+    include-parameter-values: ${JDBC_INCLUDE_PARAMETER_VALUES:true}
   opentelemetry:
     analysis:
       sanitize:
@@ -97,9 +97,9 @@ jdbc:
 
 observability:
   pii:
-    redis-values-enabled: ${OBSERVABILITY_PII_REDIS_VALUES:false}
+    redis-values-enabled: ${OBSERVABILITY_PII_REDIS_VALUES:true}
   noise-reduction:
-    health-endpoints-enabled: ${OTEL_HEALTH_ENDPOINTS_ENABLED:false}
+    health-endpoints-enabled: ${OTEL_HEALTH_ENDPOINTS_ENABLED:true}
 
 azure:
   eventhub:
