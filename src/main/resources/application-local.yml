@@ -47,6 +47,8 @@ logging:
   sensitive:
     fields: ${LOGGING_SENSITIVE_FIELDS:password,senha,access_token,accessToken,Authorization}
     mask-enabled: ${LOGGING_MASK_ENABLED:false}
+  otel-events:
+    enabled: ${OTEL_LOG_EVENTS_ENABLED:true}
 
 spring:
   application:
@@ -68,7 +70,6 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         default_schema: ${spring.datasource.schema}
-    show-sql: true
   flyway:
     enabled: true
     url: ${BMS_DATABASE_URL:${spring.datasource.base-url}?currentSchema=${spring.datasource.schema}}
@@ -92,7 +93,6 @@ jdbc:
     include-parameter-values: ${JDBC_INCLUDE_PARAMETER_VALUES:true}
     query:
       enable-logging: ${JDBC_QUERY_LOGGING_ENABLED:true}
-      log-level: INFO
   opentelemetry:
     analysis:
       sanitize:

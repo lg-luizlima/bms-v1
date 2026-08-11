@@ -56,6 +56,10 @@
         <appender-ref ref="OpenTelemetry" />
     </appender>
 
+    <!-- Transforma log.info/warn/error de br.com.tlf.* (a aplicação, não framework) em eventos
+         no span OTel ativo — visível direto na timeline  -->
+    <appender name="OtelSpanEvent" class="br.com.tlf.logging.SpanEventLoggingAppender" />
+
     <root level="info">
         <appender-ref ref="ASYNC_STDOUT" />
         <appender-ref ref="ASYNC_OTEL" />
@@ -71,5 +75,11 @@
     <logger name="customLogger" level="DEBUG" additivity="false">
         <appender-ref ref="ASYNC_CUSTOM" />
         <appender-ref ref="ASYNC_OTEL" />
+    </logger>
+
+    <!-- additivity="true" mantém o encaminhamento normal pro STDOUT/OTLP-logs via root intacto
+         — este é um canal adicional (eventos de span), não substitui nada. -->
+    <logger name="br.com.tlf" level="info" additivity="true">
+        <appender-ref ref="OtelSpanEvent" />
     </logger>
 </configuration>

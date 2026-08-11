@@ -51,6 +51,8 @@ logging:
   sensitive:
     fields: ${LOGGING_SENSITIVE_FIELDS:password,senha,access_token,accessToken,Authorization}
     mask-enabled: ${LOGGING_MASK_ENABLED:true}
+  otel-events:
+    enabled: ${OTEL_LOG_EVENTS_ENABLED:false}
 
 spring:
   application:
