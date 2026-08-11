@@ -94,7 +94,10 @@ public class JwtTokenUtils {
             var jsonString = mapper.writeValueAsString(claimsMap);
 
             var rootNode = mapper.readTree(jsonString);
-            var idNode = rootNode.path("cpf");
+
+
+            var  idNode = rootNode.path("cpf");
+
 
             return idNode.asText();
 

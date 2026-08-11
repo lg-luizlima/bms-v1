@@ -14,6 +14,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
 import io.micrometer.tracing.propagation.Propagator;
@@ -38,6 +40,7 @@ import br.com.tlf.core.port.out.eventhub.EventHubPort;
 import br.com.tlf.core.port.out.eventhub.dto.request.EventHubRequestDTO;
 import br.com.tlf.core.port.out.outbox.OutboxEventQueueRepository;
 import br.com.tlf.core.port.out.termscatalog.TermsCatalogRepository;
+import br.com.tlf.shared.observability.ObservabilityPiiProperties;
 import br.com.tlf.shared.util.HmacUtils;
 import br.com.tlf.shared.util.JsonSerializer;
 import br.com.tlf.shared.util.jwt.JwtTokenUtils;
@@ -60,6 +63,8 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         private final TransactionTemplate transactionTemplate;
         private final Tracer tracer;
         private final Propagator propagator;
+        private final ObservationRegistry observationRegistry;
+        private final ObservabilityPiiProperties observabilityPiiProperties;
         @Value("${features.eventhub.parallel-publish-enabled:true}")
         private boolean eventHubParallelPublishEnabled = true;
 
@@ -82,15 +87,29 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
 
                 processAcceptedTerms(cpf, customerId, consentRequestVO, latestActiveByProduct);
 
-                redisTemplate.opsForValue().set(
-                                "sync_status:" + consentRequestVO.getCustomerId(),
-                                "PROCESSING",
-                                MAX_VALIDITY_DAYS,
-                                TimeUnit.DAYS);
+                writeSyncStatus(consentRequestVO.getCustomerId());
 
                 return ConsentResponseDTO.builder()
                                 .consentReceivedAt(Instant.now())
                                 .build();
+        }
+
+        private void writeSyncStatus(String customerId) {
+                String redisKey = "sync_status:" + customerId;
+                String redisValue = "PROCESSING";
+
+                Observation redisWriteObservation = Observation.createNotStarted("redis.sync_status.write", observationRegistry)
+                                .contextualName("SET sync_status")
+                                .lowCardinalityKeyValue("redis.command", "SET");
+
+                if (observabilityPiiProperties.isRedisValuesEnabled()) {
+                        redisWriteObservation
+                                        .highCardinalityKeyValue("redis.key", redisKey)
+                                        .highCardinalityKeyValue("redis.value", redisValue);
+                }
+
+                redisWriteObservation.observe(() ->
+                                redisTemplate.opsForValue().set(redisKey, redisValue, MAX_VALIDITY_DAYS, TimeUnit.DAYS));
         }
 
         private void publishEventHubIfEnabled(ConsentRequestDTO requestDTO) {

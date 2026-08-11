@@ -47,6 +47,56 @@ Event Hub synchronous publish is kept temporarily in parallel, controlled by:
 
 When this flag is `false`, app still writes outbox and Debezium remains the primary publication path.
 
+## Observability
+
+### Trace propagation through Debezium/CDC
+
+`CreditCoreServiceImpl.currentTraceParent()` captures the current span's W3C `traceparent`
+(via injected `Tracer`/`Propagator`) into `tb_outbox_events.trace_context` in the same
+transaction as the outbox write. Debezium's outbox `EventRouter` promotes that column to a
+Kafka header (`debezium.json`'s `transforms.outbox.table.fields.additional.placement`,
+`trace_context:header:traceparent`). The worker's `KafkaConsumerConfig`/`KafkaProducerConfig`
+have `ContainerProperties`/`KafkaTemplate.setObservationEnabled(true)` +
+`setObservationRegistry(...)`, so Spring Kafka auto-extracts/injects that header — Kafka
+consumption becomes a child span of the original HTTP request, not a new trace root. No manual
+propagation code beyond the outbox column capture. `ApiExceptionHandler` uses the same `Tracer`
+to put the real OTel trace id (not a random UUID) into every `ProblemDetailResponse.traceId`.
+
+### SQL and Redis spans (PII policy: local/dev show values, hml/prod redact them)
+
+- **SQL**: `net.ttddyy.observation:datasource-micrometer-spring-boot` (+ `-opentelemetry`,
+  `2.2.1`) — auto-configured via the jar's own `AutoConfiguration.imports`, no bean wiring
+  needed. Produces `db.query.text` on every JDBC span, but that text is **always**
+  parametrized (`?`) since Hibernate exclusively uses `PreparedStatement` — the
+  `jdbc.opentelemetry.analysis.sanitize.enabled` flag only strips literals from raw
+  `Statement` SQL (verified against the library's bytecode; it never reaches this app's
+  span attributes). **Actual bind parameter values** come from a separate mechanism:
+  `jdbc.datasource-proxy.query.enable-logging` (`local`/`dev` only) turns on the underlying
+  `datasource-proxy`'s SLF4J query logger, which logs the fully-bound SQL — those log lines
+  carry `trace_id`/`span_id` via the same OTel logs bridge as everything else, so they're
+  queryable alongside the span in Grafana even though they aren't span attributes.
+  `application-{local,dev,hml,prod}.yml` template all of this `${VAR:default}` per profile —
+  query-value logging on in local/dev, off (default) in hml/prod.
+- **Redis**: Lettuce Observation is automatic in Boot 4.1
+  (`LettuceObservationAutoConfiguration`, classpath-triggered once an `ObservationRegistry`
+  bean exists — no property enables it) but only ever emits command name + peer address, never
+  key/value. `CreditCoreServiceImpl.writeSyncStatus(...)` wraps the single Redis write in a
+  manual `Observation` (`redis.sync_status.write`, parent of Boot's automatic `SET` command
+  span) that attaches `redis.key`/`redis.value` as span attributes only when
+  `observability.pii.redis-values-enabled=true` (`ObservabilityPiiProperties` — `true` in
+  local/dev, `false` in hml/prod).
+
+### Local observability stack
+
+`debezium-docker-compose.yaml` (this repo) brings up `otel-collector` (4317 grpc / 4318 http),
+`tempo` (3200), `jaeger` (16686), `loki` (3100), `prometheus` (9090, scrapes all 3 apps via
+`host.docker.internal:{8082,8089,8084}/actuator/prometheus`), `grafana` (3000, anonymous
+admin). Query a trace via Grafana's Tempo datasource, or directly:
+`GET http://localhost:3200/api/traces/{trace_id}` (Tempo) or `http://localhost:16686` (Jaeger
+UI, same OTLP data). Known gap: the collector's `metrics` pipeline
+(`otel-collector-config.yaml`) only exports to `debug` — no real metrics backend over OTLP;
+the Prometheus *scrape* of `/actuator/prometheus` is the only working metrics path today.
+
 ## Testing
 
 ```bash
@@ -67,9 +117,9 @@ Hexagonal (Ports & Adapters), Java 21, blocking JPA/Hibernate + Spring MVC (Tomc
 - **api** — REST layer: controllers, request/response DTOs, exception handlers
 - **core** — Domain: port interfaces (`port/in`, `port/out`), application services, domain VOs, exceptions
 - **infrastructure** — Outbound adapters: PostgreSQL JPA, Azure Event Hub, outbox pattern
-- **shared** — Cross-cutting: utilities (`HmacUtils`, `JwtTokenUtils`, `MathUtils`), config beans (including `WebClientConfiguration`)
+- **shared** — Cross-cutting: utilities (`HmacUtils`, `JwtTokenUtils`, `MathUtils`), config beans (`observability/OpenTelemetryLoggingConfig`, `observability/ObservabilityPiiProperties`)
 
-`spring-boot-starter-webflux`/`reactor-netty` are also on the classpath, but **not** used on the request path — Spring Boot picks the Servlet stack (Tomcat) because `spring-boot-starter-web` is present too (`DispatcherServlet` on the classpath wins regardless of WebFlux also being there). Webflux is kept solely so `WebClientConfiguration` (`shared/configuration/common/webclient/`) can build a `WebClient`/`reactor.netty.http.client.HttpClient` for outbound calls — don't be surprised to find it in the dependency tree of an otherwise-blocking service.
+This repo has **no outbound HTTP client and no WebFlux dependency** — the only outbound integrations are Postgres (JPA), Redis (Lettuce), and Azure Event Hub. (The middleware repo, `ms-vivo-fintech-middleware-lending-core-credit-v1`, is the one with a `WebClientConfiguration`/`RestClient` outbound setup — don't confuse the two.)
 
 ### Request flow
 
@@ -160,13 +210,13 @@ Default profile is `local`. Production profiles (`dev`, `hml`, `prod`) require:
 
 ## Key Dependencies
 
-- **Spring Boot** (lib-starter-parent:4.1.2), **Spring MVC** (Tomcat) + **Spring Data JPA**, **Flyway** (schema), Spring Data Redis (blocking)
-- **Spring WebFlux** — present but only backs `WebClientConfiguration`'s outbound `WebClient`, not the request path (see Architecture)
+- **Spring Boot** (lib-starter-parent:4.1.2), **Spring MVC** (Tomcat) + **Spring Data JPA**, **Flyway** (schema), Spring Data Redis (blocking, Lettuce client)
 - **Azure Event Hubs** — outbound event publishing (`EventHubProducerClient`, blocking)
 - **MapStruct 1.5.3** + **Lombok** — VO/entity mapping
 - **java-jwt 4.4.0** + **jjwt 0.11.5** — JWT parsing in `JwtTokenUtils`
 - **SpringDoc OpenAPI 3** — Swagger UI
 - **Netflix Eureka Client** — service discovery
-- **Observability** (`spring-boot-starter-opentelemetry`) — Micrometer Tracing (OTel bridge) + OTLP trace/metrics export, fully managed by the Boot BOM (no explicit version pin needed, unlike `resilience4j`-style dependencies — confirmed against the `spring-boot-dependencies:4.1.0` POM). See README's "Observabilidade — OpenTelemetry" section (worker repo) for the full end-to-end design; this repo's role is capturing the current span's W3C traceparent into `tb_outbox_events.trace_context` so Debezium can promote it to a Kafka header.
+- **Observability** (`spring-boot-starter-opentelemetry`) — Micrometer Tracing (OTel bridge) + OTLP trace/metrics export, fully managed by the Boot BOM (no explicit version pin needed, unlike `resilience4j`-style dependencies — confirmed against the `spring-boot-dependencies:4.1.0` POM). See README's "Observabilidade — OpenTelemetry" section (worker repo) for the full end-to-end design; this repo's role is capturing the current span's W3C traceparent into `tb_outbox_events.trace_context` so Debezium can promote it to a Kafka header. See "Observability" section below for SQL/Redis span instrumentation.
 - **Logs bridge** (`io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.21.0-alpha`) — pinned explicitly (not BOM-managed); its transitive `opentelemetry-api-incubator` must be excluded and repinned to `1.62.0-alpha` to match the SDK version Boot brings, or startup fails with `NoSuchMethodError`. Installed via `br.com.tlf.shared.observability.OpenTelemetryLoggingConfig` + an `OpenTelemetry` appender added to the existing `logback-spring.xml`.
 - **Metrics scrape** (`io.micrometer:micrometer-registry-prometheus`) — no `<version>` (managed by the `micrometer-bom` `spring-boot-dependencies` imports), exposes `/actuator/prometheus` alongside the existing OTLP metrics push.
+- **SQL spans** (`net.ttddyy.observation:datasource-micrometer-spring-boot` + `-opentelemetry`, `2.2.1`) — Boot 4.1 has no native JDBC/Observation instrumentation; this library wraps the `DataSource` via `datasource-proxy` internally, auto-configured (no manual bean). See "Observability" section below.
