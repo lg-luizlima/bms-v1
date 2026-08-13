@@ -29,6 +29,9 @@ public class TermsCatalogJpaEntity {
     @Column(name = "term_code", length = 100, nullable = false)
     private String termCode;
 
+    @Column(name = "title", length = 255, nullable = false)
+    private String title;
+
     @Column(name = "version", nullable = false)
     private String version;
 

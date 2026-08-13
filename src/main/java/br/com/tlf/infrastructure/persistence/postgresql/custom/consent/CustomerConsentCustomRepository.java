@@ -23,11 +23,11 @@ public class CustomerConsentCustomRepository implements CustomerConsentRepositor
     private final CustomerConsentRepositoryMapper customerConsentRepositoryMapper;
 
     @Override
-    public CustomerConsentVO getActiveCustomerConsent(String cpfHash, String termCode) {
-        log.info("Getting active consent termId for cpfHash={}, termCode={}", cpfHash, termCode);
+    public CustomerConsentVO getActiveCustomerConsent(String cpf, String termCode) {
+        log.info("Getting active consent termId for cpf={}, termCode={}", cpf, termCode);
 
         return customerConsentJpaRepository
-                .findActiveByCpfHashAndTermCode(cpfHash, termCode)
+                .findActiveByCpfAndTermCode(cpf, termCode)
                 .map(customerConsentRepositoryMapper::toVO)
                 .orElse(null);
     }

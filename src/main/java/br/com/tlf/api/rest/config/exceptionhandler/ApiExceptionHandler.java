@@ -99,7 +99,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ProductNotFoundException.class)
     public ResponseEntity<ProblemDetailResponse> productNotFoundException(ProductNotFoundException ex) {
-        HttpStatus status = HttpStatus.BAD_REQUEST;
+        HttpStatus status = HttpStatus.NOT_FOUND;
 
         log.error("[ApiExceptionHandler] product not found: {}", ex.getMessage());
 

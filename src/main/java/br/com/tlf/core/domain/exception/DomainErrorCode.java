@@ -6,7 +6,7 @@ package br.com.tlf.core.domain.exception;
  */
 public enum DomainErrorCode {
     MISSING_AUDIT_DATA(4001),
-    PRODUCT_NOT_FOUND(4002),
+    PRODUCT_NOT_FOUND(4040),
     INVALID_TERM(4221),
     MANDATORY_TERM_NOT_ACCEPTED(4222),
     UNEXPECTED_ERROR(5000);

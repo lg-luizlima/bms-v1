@@ -12,11 +12,11 @@ public interface CustomerConsentJpaRepository extends JpaRepository<CustomerCons
 
     @Query("""
         SELECT c FROM CustomerConsentJpaEntity c
-        WHERE c.cpfHash = :cpfHash
+        WHERE c.cpf = :cpf
           AND c.termCode = :termCode
           AND c.expiresAt > CURRENT_TIMESTAMP
         ORDER BY c.acceptedAt DESC
         LIMIT 1
     """)
-    Optional<CustomerConsentJpaEntity> findActiveByCpfHashAndTermCode(String cpfHash, String termCode);
+    Optional<CustomerConsentJpaEntity> findActiveByCpfAndTermCode(String cpf, String termCode);
 }

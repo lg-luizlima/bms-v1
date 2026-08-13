@@ -62,7 +62,7 @@ public class ConsentRequestDummies {
 
     /**
      * VO equivalent of requestWithMandatoryTerm().
-     * cpf field holds the cpfHash (CUSTOMER_ID) as passed to the mapper.
+     * cpf field holds the cpf (CUSTOMER_ID) as passed to the mapper.
      */
     public static ConsentRequestVO consentRequestVO() {
         return ConsentRequestVO.builder()
