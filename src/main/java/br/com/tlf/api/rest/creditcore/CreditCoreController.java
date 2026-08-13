@@ -44,7 +44,7 @@ public class CreditCoreController {
     }
 
     @PostMapping(UrlConstant.CONSENTS_URI)
-    @ResponseStatus(HttpStatus.ACCEPTED)
+    @ResponseStatus(HttpStatus.CREATED)
     public ResponseDTO createConsent(@RequestHeader String authorization, @RequestBody ConsentRequestDTO request,
             @RequestHeader("x-channel-id") String channelId,
             @RequestHeader("x-correlation-id") String correlationId,

@@ -21,8 +21,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -86,6 +88,7 @@ class CreditCoreServiceImplTest {
     @Spy private ObservationRegistry observationRegistry = ObservationRegistry.create();
     @Spy private ObservabilityPiiProperties observabilityPiiProperties = new ObservabilityPiiProperties();
     @Spy private CustomerIdResolver customerIdResolver = new CustomerIdResolver();
+    @Mock private ConsentIdempotencyChecker consentIdempotencyChecker;
 
     @InjectMocks
     private CreditCoreServiceImpl underTest;
@@ -139,6 +142,30 @@ class CreditCoreServiceImplTest {
             verify(customerConsentRepository).saveConsent(consentVO);
             verify(outboxEventQueueRepository).save(outboxVO);
             verify(valueOperations).set("sync_status:" + CUSTOMER_ID, "PROCESSING", MAX_VALIDITY_DAYS, TimeUnit.DAYS);
+            verify(consentIdempotencyChecker).cacheResponse(eq(CUSTOMER_ID), eq("correlation-1"), any());
+        }
+    }
+
+    @Test
+    void createConsent_idempotentReplay_returnsCachedResponseWithoutReprocessing() {
+        Instant cachedConsentReceivedAt = Instant.parse("2026-08-13T10:00:00Z");
+
+        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class)) {
+
+            jwtMock.when(() -> JwtTokenUtils.cpfToken(BEARER_TOKEN)).thenReturn(CPF_PLAIN);
+
+            when(consentIdempotencyChecker.findCachedResponse(CUSTOMER_ID, "correlation-1"))
+                    .thenReturn(Optional.of(cachedConsentReceivedAt));
+
+            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm(), "channel-1", "correlation-1", "customer-1");
+
+            assertThat(response.getConsentReceivedAt()).isEqualTo(cachedConsentReceivedAt);
+            verify(eventHubPort, never()).sendEvent(any());
+            verify(termsCatalogRepository, never()).findLatestActiveByProduct(any());
+            verify(customerConsentRepository, never()).saveConsent(any());
+            verify(outboxEventQueueRepository, never()).save(any());
+            verify(redisTemplate, never()).opsForValue();
+            verify(consentIdempotencyChecker, never()).cacheResponse(any(), any(), any());
         }
     }
 

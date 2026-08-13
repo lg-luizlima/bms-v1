@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -65,6 +66,7 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         private final ObservationRegistry observationRegistry;
         private final ObservabilityPiiProperties observabilityPiiProperties;
         private final CustomerIdResolver customerIdResolver;
+        private final ConsentIdempotencyChecker consentIdempotencyChecker;
         @Value("${features.eventhub.parallel-publish-enabled:true}")
         private boolean eventHubParallelPublishEnabled = true;
 
@@ -72,13 +74,21 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         public ConsentResponseDTO createConsent(String authorization, ConsentRequestDTO requestDTO, String channelId,
                         String correlationId, String customerIdHeader) {
 
-                publishEventHubIfEnabled(requestDTO);
-
                 String customerId = customerIdResolver.resolve(authorization, customerIdHeader);
+
+                Optional<Instant> cachedResponse = consentIdempotencyChecker.findCachedResponse(customerId, correlationId);
+                if (cachedResponse.isPresent()) {
+                        log.info("[createConsent] Idempotent replay for customerId: {}, correlationId: {}", customerId, correlationId);
+                        return ConsentResponseDTO.builder()
+                                        .consentReceivedAt(cachedResponse.get())
+                                        .build();
+                }
+
+                publishEventHubIfEnabled(requestDTO);
 
                 log.debug("createConsent - customerId: {}, product: {}, acceptedTerms: {}, channelId: {}, correlationId: {}, customerIdHeader: {}",
                         customerId, requestDTO.getProduct(), requestDTO.getAcceptedTerms(), channelId, correlationId, customerIdHeader);
-                
+
                 ConsentRequestVO consentRequestVO = creditCoreMapper.toVO(requestDTO, customerId);
 
                 List<TermsCatalogVO> latestActiveByProduct = termsCatalogRepository
@@ -90,9 +100,13 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
 
                 writeSyncStatus(consentRequestVO.getCustomerId());
 
-                return ConsentResponseDTO.builder()
+                ConsentResponseDTO response = ConsentResponseDTO.builder()
                                 .consentReceivedAt(Instant.now())
                                 .build();
+
+                consentIdempotencyChecker.cacheResponse(customerId, correlationId, response.getConsentReceivedAt());
+
+                return response;
         }
 
         private void writeSyncStatus(String customerId) {

@@ -2,17 +2,20 @@ package br.com.tlf.core.application.service.customer;
 
 import java.util.List;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import br.com.tlf.core.domain.exception.MandatoryTermNotAcceptedException;
 import br.com.tlf.shared.util.jwt.JwtTokenUtils;
 
+@Slf4j
 @Component
 public class CustomerIdResolver {
 
         public String resolve(String authorization, String customerIdHeader) {
                 String customerId = customerIdHeader;
-                if (customerIdHeader != null && !customerIdHeader.isEmpty()) {
+                log.info("Resolving customerId for authorization: {} and customerIdHeader: {}", authorization, customerIdHeader);
+                if (customerIdHeader == null || customerIdHeader.isEmpty()) {
                         customerId = JwtTokenUtils.cpfToken(authorization);
                 }
 

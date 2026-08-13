@@ -1,7 +1,5 @@
 package br.com.tlf.api.rest.config.exceptionhandler.model;
 
-import java.util.List;
-
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import lombok.AllArgsConstructor;
@@ -14,12 +12,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ProblemDetailResponse {
+public class ErrorDetail {
 
-    private Integer errorCode;
+    private Integer code;
+    private String field;
     private String message;
-    private String details;
-    private String timestamp;
-    private String traceId;
-    private List<ErrorDetail> errors;
 }

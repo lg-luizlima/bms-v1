@@ -152,7 +152,7 @@ Base path: `/credit-core/v1`
 | Method | Path | Description | Auth Header | Response |
 |--------|------|-------------|-------------|----------|
 | GET | `/terms` | Get pending terms for a product | `authorization` | 200 `ActiveConsentResponseDTO` |
-| POST | `/consents` | Create customer consent | `authorization` | 201 (no body) |
+| POST | `/consents` | Create customer consent | `authorization` | 201 `ConsentResponseDTO` (wrapped in `ResponseDTO` envelope) |
 
 ### Key port contracts
 
