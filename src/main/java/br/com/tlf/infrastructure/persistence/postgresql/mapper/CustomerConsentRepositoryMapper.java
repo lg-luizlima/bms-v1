@@ -10,10 +10,10 @@ import br.com.tlf.infrastructure.persistence.postgresql.entity.CustomerConsentJp
 public interface CustomerConsentRepositoryMapper {
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "cpfHash", source = "customerId")
+    @Mapping(target = "cpf", source = "customerId")
     CustomerConsentJpaEntity toEntity(CustomerConsentVO consentVO);
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "customerId", source = "cpfHash")
+    @Mapping(target = "customerId", source = "cpf")
     CustomerConsentVO toVO(CustomerConsentJpaEntity consentEntity);
 }

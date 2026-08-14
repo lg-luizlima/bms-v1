@@ -1,16 +1,22 @@
 package br.com.tlf.api.rest.config.exceptionhandler;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.MDC;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import br.com.tlf.api.rest.config.exceptionhandler.model.ErrorDetail;
 import br.com.tlf.api.rest.config.exceptionhandler.model.ProblemDetailResponse;
 import br.com.tlf.core.domain.exception.DomainErrorCode;
 import br.com.tlf.core.domain.exception.InvalidTermException;
@@ -34,6 +40,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return currentSpan != null ? currentSpan.context().traceId() : UUID.randomUUID().toString();
     }
 
+    private List<ErrorDetail> toErrorDetails(List<String> messages) {
+        return messages.stream()
+                .map(message -> ErrorDetail.builder().message(message).build())
+                .toList();
+    }
+
     @ExceptionHandler(MissingAuditDataException.class)
     public ResponseEntity<ProblemDetailResponse> missingAuditDataException(MissingAuditDataException ex) {
         HttpStatus status = HttpStatus.BAD_REQUEST;
@@ -49,7 +61,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .details("A assinatura de auditoria requer os dados do dispositivo (IP, DeviceId).")
                 .timestamp(Instant.now().toString())
                 .traceId(currentTraceId())
-                .errors(ex.getErrors())
+                .errors(toErrorDetails(ex.getErrors()))
                 .build();
 
         return ResponseEntity.status(status).body(body);
@@ -70,7 +82,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .details(ex.getMessage())
                 .timestamp(Instant.now().toString())
                 .traceId(currentTraceId())
-                .errors(ex.getErrors())
+                .errors(toErrorDetails(ex.getErrors()))
                 .build();
 
         return ResponseEntity.status(status).body(body);
@@ -91,7 +103,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .details(ex.getMessage())
                 .timestamp(Instant.now().toString())
                 .traceId(currentTraceId())
-                .errors(ex.getErrors())
+                .errors(toErrorDetails(ex.getErrors()))
                 .build();
 
         return ResponseEntity.status(status).body(body);
@@ -99,7 +111,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ProductNotFoundException.class)
     public ResponseEntity<ProblemDetailResponse> productNotFoundException(ProductNotFoundException ex) {
-        HttpStatus status = HttpStatus.BAD_REQUEST;
+        HttpStatus status = HttpStatus.NOT_FOUND;
 
         log.error("[ApiExceptionHandler] product not found: {}", ex.getMessage());
 
@@ -112,10 +124,38 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .details(ex.getMessage())
                 .timestamp(Instant.now().toString())
                 .traceId(currentTraceId())
-                .errors(ex.getErrors())
+                .errors(toErrorDetails(ex.getErrors()))
                 .build();
 
         return ResponseEntity.status(status).body(body);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+
+        log.error("[ApiExceptionHandler] request body validation failed: {}", ex.getMessage());
+
+        String stackTrace = ExceptionUtils.getStackTrace(ex);
+        MDC.put("exception", stackTrace.length() > 500 ? stackTrace.substring(0, 500) : stackTrace);
+
+        List<ErrorDetail> errors = ex.getBindingResult().getFieldErrors().stream()
+                .map(fieldError -> ErrorDetail.builder()
+                        .field(fieldError.getField())
+                        .message(fieldError.getDefaultMessage())
+                        .build())
+                .toList();
+
+        ProblemDetailResponse body = ProblemDetailResponse.builder()
+                .errorCode(DomainErrorCode.BAD_REQUEST.getCode())
+                .message("Bad Request Error")
+                .details("Required field is missing or null inside the request body.")
+                .timestamp(Instant.now().toString())
+                .traceId(currentTraceId())
+                .errors(errors)
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     //Keep this handler as the last one, to catch any unexpected exceptions that may occur in the application

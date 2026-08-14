@@ -13,8 +13,8 @@ public interface TermsCatalogJpaRepository extends JpaRepository<TermsCatalogJpa
     @Query("""
         SELECT t FROM TermsCatalogJpaEntity t
         WHERE t.product = :product
-          AND t.startAt <= CURRENT_DATE
-          AND (t.endAt IS NULL OR t.endAt >= CURRENT_DATE)
+          AND t.startAt <= CURRENT_TIMESTAMP
+          AND (t.endAt IS NULL OR t.endAt >= CURRENT_TIMESTAMP)
     """)
     List<TermsCatalogJpaEntity> findLatestActiveByProduct(String product);
 }

@@ -121,6 +121,26 @@ Hexagonal (Ports & Adapters), Java 21, blocking JPA/Hibernate + Spring MVC (Tomc
 
 This repo has **no outbound HTTP client and no WebFlux dependency** — the only outbound integrations are Postgres (JPA), Redis (Lettuce), and Azure Event Hub. (The middleware repo, `ms-vivo-fintech-middleware-lending-core-credit-v1`, is the one with a `WebClientConfiguration`/`RestClient` outbound setup — don't confuse the two.)
 
+### Database access — sync only, JPA, never R2DBC
+
+This service is **100% synchronous/blocking** end-to-end: Spring MVC (Tomcat) on the
+request path and **Spring Data JPA/Hibernate** for every database interaction. There is
+no reactive stack anywhere in this codebase.
+
+**Never introduce R2DBC, WebFlux, or any reactive database client** (`spring-boot-starter-data-r2dbc`,
+`io.r2dbc.*`, `ReactiveTransactionManager`, `DatabaseClient`, `Mono`/`Flux` repositories, etc.) in this
+repo. All persistence must go through:
+- Entities in `infrastructure/persistence/postgresql/entity/` (suffix `JpaEntity`), mapped with JPA
+  annotations (`@Entity`, `@Table`, `@Column`, ...).
+- `JpaRepository` interfaces in `infrastructure/persistence/postgresql/jpa/`.
+- Custom repository adapters in `infrastructure/persistence/postgresql/custom/` implementing the
+  domain's `port/out` repository interfaces, using blocking `TransactionTemplate`/`@Transactional` calls.
+
+If a future requirement seems to call for non-blocking DB access, treat that as a decision requiring
+explicit product/architecture sign-off and a dedicated migration plan — do not add reactive
+persistence code speculatively or as a partial/parallel implementation alongside the existing JPA
+adapters.
+
 ### Request flow
 
 `CreditCoreController` → `CreditCorePortIn` → `CreditCoreServiceImpl` → out-port interfaces → infrastructure adapters
@@ -132,7 +152,7 @@ Base path: `/credit-core/v1`
 | Method | Path | Description | Auth Header | Response |
 |--------|------|-------------|-------------|----------|
 | GET | `/terms` | Get pending terms for a product | `authorization` | 200 `ActiveConsentResponseDTO` |
-| POST | `/consents` | Create customer consent | `authorization` | 201 (no body) |
+| POST | `/consents` | Create customer consent | `authorization` | 201 `ConsentResponseDTO` (wrapped in `ResponseDTO` envelope) |
 
 ### Key port contracts
 
@@ -145,7 +165,7 @@ Base path: `/credit-core/v1`
 | `EventHubPort` | `core/port/out/eventhub/` | `EventHubAdapter` (`EventHubProducerClient`) |
 
 **CustomerConsentRepository methods:**
-- `CustomerConsentVO getActiveCustomerConsent(String cpfHash, String termCode)`
+- `CustomerConsentVO getActiveCustomerConsent(String cpf, String termCode)`
 - `CustomerConsentVO saveConsent(CustomerConsentVO consent)`
 
 **TermsCatalogRepository methods:**
@@ -155,10 +175,10 @@ The consent + outbox write is wrapped in a single transaction via `TransactionTe
 
 ### Domain model
 
-The service manages versioned **terms catalogs** per product (e.g. `EP_INSS`) and records customer **consents** (accepted terms + audit signature). CPFs are hashed with `HmacUtils.generateHmacSha256` before use as `cpfHash` anywhere (repository lookups, Redis keys). Consent events are published to Azure Event Hub using the **outbox pattern** (`tb_outbox_events` table, consumed by Debezium CDC). Redis (`StringRedisTemplate`) caches processing status during consent creation with key `sync_status:{cpfHash}`.
+The service manages versioned **terms catalogs** per product (e.g. `EP_INSS`) and records customer **consents** (accepted terms + audit signature). cpf are not hashed anywhere (repository lookups, Redis keys) lib-fintech-logs leads with de security problem . Consent events are published to Azure Event Hub using the **outbox pattern** (`tb_outbox_events` table, consumed by Debezium CDC). Redis (`StringRedisTemplate`) caches processing status during consent creation with key `sync_status:{cpf}`.
 
 **JPA entities** (`infrastructure/persistence/postgresql/entity/`):
-- `CustomerConsentJpaEntity` — cpfHash (64-char), termCode, termId (FK, plain UUID column, no relation), optIn, acceptedAt, expiresAt, auditDetails (`@JdbcTypeCode(SqlTypes.JSON)` → Postgres `jsonb`, mapped as `String`)
+- `CustomerConsentJpaEntity` — cpf (64-char), termCode, termId (FK, plain UUID column, no relation), optIn, acceptedAt, expiresAt, auditDetails (`@JdbcTypeCode(SqlTypes.JSON)` → Postgres `jsonb`, mapped as `String`)
 - `TermsCatalogJpaEntity` — product, termCode, version, isMandatory, validityDays, revokePreviousVersions, contentType, contentSummary, contentText, contentUrl, startAt, endAt
 - `OutboxEventQueueJpaEntity` — aggregateType, aggregateId, topicName, payload (jsonb), createdAt (`@CreationTimestamp`)
 

@@ -13,6 +13,7 @@ public class PendingTermVO {
 
     private String termId;
     private String termCode;
+    private String title;
     private String contentSummary;
     private String contentUrl;
     private Boolean isMandatory;

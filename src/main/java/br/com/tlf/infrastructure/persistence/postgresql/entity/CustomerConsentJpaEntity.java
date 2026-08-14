@@ -22,7 +22,7 @@ import java.util.UUID;
 @Table(
     name = "tb_customer_consents",
     indexes = {
-        @Index(name = "idx_customer_consent_cpf_hash", columnList = "cpf_hash"),
+        @Index(name = "idx_customer_consent_cpf", columnList = "cpf"),
         @Index(name = "idx_customer_consent_expires_at", columnList = "expires_at")
     }
 )
@@ -38,8 +38,8 @@ public class CustomerConsentJpaEntity {
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
 
-    @Column(name = "cpf_hash", length = 64, nullable = false)
-    private String cpfHash;
+    @Column(name = "cpf", length = 64, nullable = false)
+    private String cpf;
 
     @Column(name = "term_code", length = 100, nullable = false)
     private String termCode;

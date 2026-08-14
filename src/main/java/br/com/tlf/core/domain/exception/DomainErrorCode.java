@@ -5,8 +5,9 @@ package br.com.tlf.core.domain.exception;
  * Each code is a unique integer (expected HTTP status + additional digits) representing a specific type of business error.
  */
 public enum DomainErrorCode {
+    BAD_REQUEST(4000),
     MISSING_AUDIT_DATA(4001),
-    PRODUCT_NOT_FOUND(4002),
+    PRODUCT_NOT_FOUND(4040),
     INVALID_TERM(4221),
     MANDATORY_TERM_NOT_ACCEPTED(4222),
     UNEXPECTED_ERROR(5000);

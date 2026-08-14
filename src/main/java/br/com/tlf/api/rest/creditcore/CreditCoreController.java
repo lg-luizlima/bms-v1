@@ -33,16 +33,24 @@ public class CreditCoreController {
     @GetMapping(UrlConstant.TERMS_URI)
     @ResponseStatus(HttpStatus.OK)
     public ResponseDTO getActiveConsents(@RequestHeader String authorization,
-            @RequestParam String product) {
-        return assembler.toResponseDTO(creditCoreService.getPendingTerms(authorization, product), "ok",
+            @RequestParam String product,
+            @RequestHeader("x-channel-id") String channelId,
+            @RequestHeader("x-correlation-id") String correlationId,
+            @RequestHeader("x-customer-id") String customerId) {
+        return assembler.toResponseDTO(
+                creditCoreService.getPendingTerms(authorization, product, channelId, correlationId, customerId), "ok",
                 "Active consents retrieved successfully");
 
     }
 
     @PostMapping(UrlConstant.CONSENTS_URI)
-    @ResponseStatus(HttpStatus.ACCEPTED)
-    public ResponseDTO createConsent(@RequestHeader String authorization, @RequestBody ConsentRequestDTO request) {
-        ConsentResponseDTO consentResponse = creditCoreService.createConsent(authorization, request);
+    @ResponseStatus(HttpStatus.CREATED)
+    public ResponseDTO createConsent(@RequestHeader String authorization, @RequestBody ConsentRequestDTO request,
+            @RequestHeader("x-channel-id") String channelId,
+            @RequestHeader("x-correlation-id") String correlationId,
+            @RequestHeader("x-customer-id") String customerId) {
+        ConsentResponseDTO consentResponse = creditCoreService.createConsent(authorization, request, channelId,
+                correlationId, customerId);
         return assembler.toResponseDTO(consentResponse, "success", "Consent options registered successfully.");
     }
 }

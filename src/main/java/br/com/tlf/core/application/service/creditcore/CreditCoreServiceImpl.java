@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -22,6 +23,7 @@ import io.micrometer.tracing.propagation.Propagator;
 
 import br.com.tlf.core.application.mapper.creditcore.CreditCoreMapper;
 import br.com.tlf.core.application.mapper.outboxeventqueue.OutBoxEventQueueMapper;
+import br.com.tlf.core.application.service.customer.CustomerIdResolver;
 import br.com.tlf.core.domain.exception.InvalidTermException;
 import br.com.tlf.core.domain.exception.MandatoryTermNotAcceptedException;
 import br.com.tlf.core.domain.exception.ProductNotFoundException;
@@ -41,9 +43,7 @@ import br.com.tlf.core.port.out.eventhub.dto.request.EventHubRequestDTO;
 import br.com.tlf.core.port.out.outbox.OutboxEventQueueRepository;
 import br.com.tlf.core.port.out.termscatalog.TermsCatalogRepository;
 import br.com.tlf.shared.observability.ObservabilityPiiProperties;
-import br.com.tlf.shared.util.HmacUtils;
 import br.com.tlf.shared.util.JsonSerializer;
-import br.com.tlf.shared.util.jwt.JwtTokenUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -65,18 +65,29 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         private final Propagator propagator;
         private final ObservationRegistry observationRegistry;
         private final ObservabilityPiiProperties observabilityPiiProperties;
+        private final CustomerIdResolver customerIdResolver;
+        private final ConsentIdempotencyChecker consentIdempotencyChecker;
         @Value("${features.eventhub.parallel-publish-enabled:true}")
         private boolean eventHubParallelPublishEnabled = true;
 
         @Override
-        public ConsentResponseDTO createConsent(String authorization, ConsentRequestDTO requestDTO) {
+        public ConsentResponseDTO createConsent(String authorization, ConsentRequestDTO requestDTO, String channelId,
+                        String correlationId, String customerIdHeader) {
+
+                String customerId = customerIdResolver.resolve(authorization, customerIdHeader);
+
+                Optional<Instant> cachedResponse = consentIdempotencyChecker.findCachedResponse(customerId, correlationId);
+                if (cachedResponse.isPresent()) {
+                        log.info("[createConsent] Idempotent replay for customerId: {}, correlationId: {}", customerId, correlationId);
+                        return ConsentResponseDTO.builder()
+                                        .consentReceivedAt(cachedResponse.get())
+                                        .build();
+                }
 
                 publishEventHubIfEnabled(requestDTO);
 
-                String cpf = JwtTokenUtils.cpfToken(authorization);
-                String customerId = HmacUtils.generateHmacSha256(cpf);
-
-                log.info("createConsent - customerId: {}, product: {}, acceptedTerms: {}", customerId, requestDTO.getProduct(), requestDTO.getAcceptedTerms());
+                log.debug("createConsent - customerId: {}, product: {}, acceptedTerms: {}, channelId: {}, correlationId: {}, customerIdHeader: {}",
+                        customerId, requestDTO.getProduct(), requestDTO.getAcceptedTerms(), channelId, correlationId, customerIdHeader);
 
                 ConsentRequestVO consentRequestVO = creditCoreMapper.toVO(requestDTO, customerId);
 
@@ -85,13 +96,17 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
 
                 validateMandatoryTerms(latestActiveByProduct, consentRequestVO.getAcceptedTerms(), customerId);
 
-                processAcceptedTerms(cpf, customerId, consentRequestVO, latestActiveByProduct);
+                processAcceptedTerms(customerId, consentRequestVO, latestActiveByProduct);
 
                 writeSyncStatus(consentRequestVO.getCustomerId());
 
-                return ConsentResponseDTO.builder()
+                ConsentResponseDTO response = ConsentResponseDTO.builder()
                                 .consentReceivedAt(Instant.now())
                                 .build();
+
+                consentIdempotencyChecker.cacheResponse(customerId, correlationId, response.getConsentReceivedAt());
+
+                return response;
         }
 
         private void writeSyncStatus(String customerId) {
@@ -124,9 +139,8 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                                 .build());
         }
 
-        private void processAcceptedTerms(String cpf, String cpfToken, ConsentRequestVO consentRequestVO,
-                        List<TermsCatalogVO> latestActiveByProduct) {
-                Map<String, TermsCatalogVO> catalogMap = latestActiveByProduct.stream()
+        private Map<String, TermsCatalogVO> latestVersionPerTermCode(List<TermsCatalogVO> terms) {
+                return terms.stream()
                                 .collect(Collectors.toMap(
                                                 TermsCatalogVO::getTermCode,
                                                 t -> t,
@@ -135,6 +149,11 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                                                         double replacementVersion = Double.parseDouble(replacement.getVersion());
                                                         return replacementVersion > existingVersion ? replacement : existing;
                                                 }));
+        }
+
+        private void processAcceptedTerms(String customerId, ConsentRequestVO consentRequestVO,
+                        List<TermsCatalogVO> latestActiveByProduct) {
+                Map<String, TermsCatalogVO> catalogMap = latestVersionPerTermCode(latestActiveByProduct);
 
                 for (AcceptedTermVO acceptedTerm : consentRequestVO.getAcceptedTerms()) {
                         TermsCatalogVO catalogTerm = catalogMap.get(acceptedTerm.getTermCode());
@@ -146,25 +165,31 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                                                 List.of(acceptedTerm.getTermCode()));
                         }
 
-                        if (!isTermSigned(catalogTerm, cpfToken)) {
-                                log.info("[createConsent] Saving consent for customerId: {}, termCode: {}, termId: {}", cpfToken, acceptedTerm.getTermCode(), catalogTerm.getId());
-                                CustomerConsentVO consent = creditCoreMapper.toCustomerConsentVO(cpfToken, consentRequestVO, acceptedTerm, catalogTerm);
-                                saveConsentAtomically(consent, cpf);
+                        if (!isTermSigned(catalogTerm, customerId)) {
+                                log.info("[createConsent] Saving consent for customerId: {}, termCode: {}, termId: {}", customerId, acceptedTerm.getTermCode(), catalogTerm.getId());
+                                CustomerConsentVO consent = creditCoreMapper.toCustomerConsentVO(customerId, consentRequestVO, acceptedTerm, catalogTerm);
+                                saveConsentAtomically(consent, customerId);
                         }else{
-                                log.info("[createConsent] Term already signed for customerId: {}, termCode: {}, termId: {}", cpfToken, acceptedTerm.getTermCode(), catalogTerm.getId());
+                                log.info("[createConsent] Term already signed for customerId: {}, termCode: {}, termId: {}", customerId, acceptedTerm.getTermCode(), catalogTerm.getId());
                         }
                 }
         }
 
         @Override
-        public ActiveConsentResponseDTO getPendingTerms(String authorization, String product) {
+        public ActiveConsentResponseDTO getPendingTerms(String authorization, String product, String channelId,
+                        String correlationId, String customerIdHeader) {
 
-                String customerId = HmacUtils.generateHmacSha256(JwtTokenUtils.cpfToken(authorization));
+                String customerId = customerIdResolver.resolve(authorization, customerIdHeader);
 
-                List<TermsCatalogVO> termsCatalog = termsCatalogRepository.findLatestActiveByProduct(product);
+                log.info("getPendingTerms - customerId: {}, product: {}, channelId: {}, correlationId: {}, customerIdHeader: {}",
+                                customerIdHeader, product, channelId, correlationId, customerIdHeader);
 
-                if (termsCatalog.isEmpty())
+                List<TermsCatalogVO> rawTermsCatalog = termsCatalogRepository.findLatestActiveByProduct(product);
+
+                if (rawTermsCatalog.isEmpty())
                         throw new ProductNotFoundException("Product not found.", List.of("No product was found for " + product));
+
+                List<TermsCatalogVO> termsCatalog = List.copyOf(latestVersionPerTermCode(rawTermsCatalog).values());
 
                 List<TermsCatalogVO> signedTerms = termsCatalog.stream()
                                 .filter(t -> isTermSigned(t, customerId))
@@ -177,7 +202,7 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                 Boolean hasPendingMandatoryTerms = pendingTerms.stream()
                                 .anyMatch((pendingTerm) -> Boolean.TRUE.equals(pendingTerm.getIsMandatory()));
 
-                log.warn("[getPendingTerms] Pending terms for CPF hash {} and product {}: {}", customerId, product, pendingTerms.size());
+                log.warn("[getPendingTerms] Pending terms for customerId hash {} and product {}: {}", customerId, product, pendingTerms.size());
 
                 ActiveConsentResponseVO build = ActiveConsentResponseVO.builder()
                                 .product(termsCatalog.getFirst().getProduct())
@@ -188,11 +213,11 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                 return creditCoreMapper.toActiveConsentResponseDTO(build);
         }
 
-        private void saveConsentAtomically(CustomerConsentVO consent, String cpf) {
+        private void saveConsentAtomically(CustomerConsentVO consent, String customerId) {
                 transactionTemplate.executeWithoutResult(status -> {
                         customerConsentRepository.saveConsent(consent);
 
-                        ConsentEventPayloadVO eventPayload = creditCoreMapper.toConsentEventPayloadVO(cpf, consent);
+                        ConsentEventPayloadVO eventPayload = creditCoreMapper.toConsentEventPayloadVO(customerId, consent);
                         outboxEventQueueRepository.save(
                                         outBoxEventQueueMapper.toVO(consent.getCustomerId(), jsonSerializer.toJson(eventPayload),
                                                         currentTraceParent()));
@@ -209,21 +234,29 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                 return carrier.get("traceparent");
         }
 
-        private boolean isTermSigned(TermsCatalogVO term, String cpfToken) {
+        private boolean isTermSigned(TermsCatalogVO term, String customerId) {
                 CustomerConsentVO existingConsent = customerConsentRepository
-                                .getActiveCustomerConsent(cpfToken, term.getTermCode());
+                                .getActiveCustomerConsent(customerId, term.getTermCode());
 
-                return existingConsent != null && existingConsent.getTermId().equals(term.getId());
+                if (existingConsent == null) {
+                        return false;
+                }
+
+                if (Boolean.TRUE.equals(term.getRevokePreviousVersions())) {
+                        return existingConsent.getTermId().equals(term.getId());
+                }
+
+                return true;
         }
 
-        private void validateMandatoryTerms(List<TermsCatalogVO> catalogTerms, List<AcceptedTermVO> acceptedTerms, String cpfToken) {
+        private void validateMandatoryTerms(List<TermsCatalogVO> catalogTerms, List<AcceptedTermVO> acceptedTerms, String customerId) {
 
                 Map<String, Boolean> acceptedTermsMap = acceptedTerms.stream()
                                 .collect(Collectors.toMap(AcceptedTermVO::getTermCode, AcceptedTermVO::getOptIn));
 
                 List<String> missingMandatoryTerms = catalogTerms.stream()
                                 .filter(term -> Boolean.TRUE.equals(term.getIsMandatory()))
-                                .filter(term -> !isTermSigned(term, cpfToken))
+                                .filter(term -> !isTermSigned(term, customerId))
                                 .filter(term -> {
                                         Boolean optIn = acceptedTermsMap.get(term.getTermCode());
                                         return optIn == null || Boolean.FALSE.equals(optIn);

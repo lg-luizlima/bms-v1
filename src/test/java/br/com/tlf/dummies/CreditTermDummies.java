@@ -13,7 +13,8 @@ public class CreditTermDummies {
 
     // ─── constantes ──────────────────────────────────────────────────────────
 
-    public static final String CUSTOMER_ID       = "hash-cpf-123";
+    /** customerId agora é o CPF puro (não há mais hash) — deve bater com ConsentRequestDummies.CPF_PLAIN. */
+    public static final String CUSTOMER_ID       = ConsentRequestDummies.CPF_PLAIN;
     public static final String PRODUCT  = ProductTypeEnum.CONSIGNADO_DATAPREV.toString();
 
     public static final UUID   REVOKED_TERM_ID   = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
@@ -36,6 +37,7 @@ public class CreditTermDummies {
                 .id(REVOKED_TERM_ID)
                 .product(PRODUCT)
                 .termCode(REVOKED_TERM_CODE)
+                .title("Autorização de Consulta Vínculos DATAPREV")
                 .version(REVOKED_VERSION)
                 .isMandatory(true)
                 .revokePreviousVersions(true)
@@ -58,6 +60,7 @@ public class CreditTermDummies {
                 .id(SOFT_TERM_ID)
                 .product(PRODUCT)
                 .termCode(SOFT_TERM_CODE)
+                .title("Política de Privacidade Crédito")
                 .version(SOFT_VERSION)
                 .isMandatory(false)
                 .revokePreviousVersions(false)

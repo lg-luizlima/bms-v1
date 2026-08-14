@@ -21,8 +21,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -41,6 +44,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import br.com.tlf.core.application.mapper.creditcore.CreditCoreMapper;
 import br.com.tlf.core.application.mapper.outboxeventqueue.OutBoxEventQueueMapper;
+import br.com.tlf.core.application.service.customer.CustomerIdResolver;
 import br.com.tlf.core.domain.exception.MandatoryTermNotAcceptedException;
 import br.com.tlf.core.domain.vo.OutBoxEventQueueVO;
 import br.com.tlf.core.domain.vo.consent.ConsentRequestVO;
@@ -58,7 +62,6 @@ import br.com.tlf.dummies.ConsentRequestDummies;
 import br.com.tlf.dummies.CreditTermDummies;
 import br.com.tlf.dummies.CustomerConsentDummies;
 import br.com.tlf.shared.observability.ObservabilityPiiProperties;
-import br.com.tlf.shared.util.HmacUtils;
 import br.com.tlf.shared.util.JsonSerializer;
 import br.com.tlf.shared.util.jwt.JwtTokenUtils;
 import io.micrometer.observation.ObservationRegistry;
@@ -84,6 +87,8 @@ class CreditCoreServiceImplTest {
     // observationConfig() internamente, o que um mock não-stubado não suportaria sem NPE.
     @Spy private ObservationRegistry observationRegistry = ObservationRegistry.create();
     @Spy private ObservabilityPiiProperties observabilityPiiProperties = new ObservabilityPiiProperties();
+    @Spy private CustomerIdResolver customerIdResolver = new CustomerIdResolver();
+    @Mock private ConsentIdempotencyChecker consentIdempotencyChecker;
 
     @InjectMocks
     private CreditCoreServiceImpl underTest;
@@ -108,11 +113,9 @@ class CreditCoreServiceImplTest {
                 .payload("{}")
                 .build();
 
-        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class);
-             MockedStatic<HmacUtils> hmacMock = mockStatic(HmacUtils.class)) {
+        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class)) {
 
             jwtMock.when(() -> JwtTokenUtils.cpfToken(BEARER_TOKEN)).thenReturn(CPF_PLAIN);
-            hmacMock.when(() -> HmacUtils.generateHmacSha256(CPF_PLAIN)).thenReturn(CUSTOMER_ID);
 
             stubTransactionTemplateToRunLambda();
 
@@ -131,7 +134,7 @@ class CreditCoreServiceImplTest {
                     .thenReturn(outboxVO);
             when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm());
+            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm(), "channel-1", "correlation-1", "customer-1");
 
             assertThat(response).isNotNull();
             assertThat(response.getConsentReceivedAt()).isNotNull();
@@ -139,6 +142,30 @@ class CreditCoreServiceImplTest {
             verify(customerConsentRepository).saveConsent(consentVO);
             verify(outboxEventQueueRepository).save(outboxVO);
             verify(valueOperations).set("sync_status:" + CUSTOMER_ID, "PROCESSING", MAX_VALIDITY_DAYS, TimeUnit.DAYS);
+            verify(consentIdempotencyChecker).cacheResponse(eq(CUSTOMER_ID), eq("correlation-1"), any());
+        }
+    }
+
+    @Test
+    void createConsent_idempotentReplay_returnsCachedResponseWithoutReprocessing() {
+        Instant cachedConsentReceivedAt = Instant.parse("2026-08-13T10:00:00Z");
+
+        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class)) {
+
+            jwtMock.when(() -> JwtTokenUtils.cpfToken(BEARER_TOKEN)).thenReturn(CPF_PLAIN);
+
+            when(consentIdempotencyChecker.findCachedResponse(CUSTOMER_ID, "correlation-1"))
+                    .thenReturn(Optional.of(cachedConsentReceivedAt));
+
+            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm(), "channel-1", "correlation-1", "customer-1");
+
+            assertThat(response.getConsentReceivedAt()).isEqualTo(cachedConsentReceivedAt);
+            verify(eventHubPort, never()).sendEvent(any());
+            verify(termsCatalogRepository, never()).findLatestActiveByProduct(any());
+            verify(customerConsentRepository, never()).saveConsent(any());
+            verify(outboxEventQueueRepository, never()).save(any());
+            verify(redisTemplate, never()).opsForValue();
+            verify(consentIdempotencyChecker, never()).cacheResponse(any(), any(), any());
         }
     }
 
@@ -147,11 +174,9 @@ class CreditCoreServiceImplTest {
         TermsCatalogVO revokedTerm = CreditTermDummies.revokedTerm();
         ConsentRequestVO requestVO = ConsentRequestDummies.consentRequestVOMissingTerm();
 
-        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class);
-             MockedStatic<HmacUtils> hmacMock = mockStatic(HmacUtils.class)) {
+        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class)) {
 
             jwtMock.when(() -> JwtTokenUtils.cpfToken(BEARER_TOKEN)).thenReturn(CPF_PLAIN);
-            hmacMock.when(() -> HmacUtils.generateHmacSha256(CPF_PLAIN)).thenReturn(CUSTOMER_ID);
 
             when(creditCoreMapper.toVO(ConsentRequestDummies.requestMissingMandatoryTerm(), CUSTOMER_ID))
                     .thenReturn(requestVO);
@@ -160,7 +185,7 @@ class CreditCoreServiceImplTest {
 
             MandatoryTermNotAcceptedException ex = assertThrows(
                     MandatoryTermNotAcceptedException.class,
-                    () -> underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestMissingMandatoryTerm()));
+                    () -> underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestMissingMandatoryTerm(), "channel-1", "correlation-1", "customer-1"));
 
             assertThat(ex.getErrors()).hasSize(1);
             assertThat(ex.getErrors().get(0)).contains(REVOKED_TERM_CODE);
@@ -177,11 +202,9 @@ class CreditCoreServiceImplTest {
         TermsCatalogVO revokedTerm = CreditTermDummies.revokedTerm();
         ConsentRequestVO requestVO = ConsentRequestDummies.consentRequestVO();
 
-        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class);
-             MockedStatic<HmacUtils> hmacMock = mockStatic(HmacUtils.class)) {
+        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class)) {
 
             jwtMock.when(() -> JwtTokenUtils.cpfToken(BEARER_TOKEN)).thenReturn(CPF_PLAIN);
-            hmacMock.when(() -> HmacUtils.generateHmacSha256(CPF_PLAIN)).thenReturn(CUSTOMER_ID);
 
             when(creditCoreMapper.toVO(ConsentRequestDummies.requestWithMandatoryTerm(), CUSTOMER_ID))
                     .thenReturn(requestVO);
@@ -191,7 +214,7 @@ class CreditCoreServiceImplTest {
                     .thenReturn(CustomerConsentDummies.consentWithTermId(REVOKED_TERM_ID, REVOKED_TERM_CODE));
             when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm());
+            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm(), "channel-1", "correlation-1", "customer-1");
 
             assertThat(response).isNotNull();
             assertThat(response.getConsentReceivedAt()).isNotNull();
@@ -209,11 +232,9 @@ class CreditCoreServiceImplTest {
         TermsCatalogVO revokedTerm = CreditTermDummies.revokedTerm();
         TermsCatalogVO softTerm = CreditTermDummies.softTerm();
 
-        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class);
-             MockedStatic<HmacUtils> hmacMock = mockStatic(HmacUtils.class)) {
+        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class)) {
 
             jwtMock.when(() -> JwtTokenUtils.cpfToken(BEARER_TOKEN)).thenReturn(CPF_PLAIN);
-            hmacMock.when(() -> HmacUtils.generateHmacSha256(CPF_PLAIN)).thenReturn(CUSTOMER_ID);
 
             when(termsCatalogRepository.findLatestActiveByProduct(PRODUCT))
                     .thenReturn(List.of(revokedTerm, softTerm));
@@ -229,7 +250,7 @@ class CreditCoreServiceImplTest {
             when(creditCoreMapper.toActiveConsentResponseDTO(voCaptor.capture()))
                     .thenReturn(ActiveConsentResponseDTO.builder().build());
 
-            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT);
+            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", "customer-1");
 
             ActiveConsentResponseVO captured = voCaptor.getValue();
             assertThat(captured.getProduct()).isEqualTo(PRODUCT);
@@ -249,11 +270,9 @@ class CreditCoreServiceImplTest {
                 .isMandatory(true)
                 .build();
 
-        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class);
-             MockedStatic<HmacUtils> hmacMock = mockStatic(HmacUtils.class)) {
+        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class)) {
 
             jwtMock.when(() -> JwtTokenUtils.cpfToken(BEARER_TOKEN)).thenReturn(CPF_PLAIN);
-            hmacMock.when(() -> HmacUtils.generateHmacSha256(CPF_PLAIN)).thenReturn(CUSTOMER_ID);
 
             when(termsCatalogRepository.findLatestActiveByProduct(PRODUCT))
                     .thenReturn(List.of(revokedTerm, softTerm));
@@ -269,7 +288,7 @@ class CreditCoreServiceImplTest {
             when(creditCoreMapper.toActiveConsentResponseDTO(voCaptor.capture()))
                     .thenReturn(ActiveConsentResponseDTO.builder().build());
 
-            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT);
+            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", "customer-1");
 
             ActiveConsentResponseVO captured = voCaptor.getValue();
             assertThat(captured.getHasPendingMandatoryTerms()).isTrue();
@@ -288,11 +307,9 @@ class CreditCoreServiceImplTest {
                 .isMandatory(false)
                 .build();
 
-        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class);
-             MockedStatic<HmacUtils> hmacMock = mockStatic(HmacUtils.class)) {
+        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class)) {
 
             jwtMock.when(() -> JwtTokenUtils.cpfToken(BEARER_TOKEN)).thenReturn(CPF_PLAIN);
-            hmacMock.when(() -> HmacUtils.generateHmacSha256(CPF_PLAIN)).thenReturn(CUSTOMER_ID);
 
             when(termsCatalogRepository.findLatestActiveByProduct(PRODUCT))
                     .thenReturn(List.of(revokedTerm, softTerm));
@@ -308,11 +325,122 @@ class CreditCoreServiceImplTest {
             when(creditCoreMapper.toActiveConsentResponseDTO(voCaptor.capture()))
                     .thenReturn(ActiveConsentResponseDTO.builder().build());
 
-            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT);
+            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", "customer-1");
 
             ActiveConsentResponseVO captured = voCaptor.getValue();
             assertThat(captured.getHasPendingMandatoryTerms()).isFalse();
             assertThat(captured.getPendingTerms()).hasSize(1);
+        }
+    }
+
+    @Test
+    void getPendingTerms_softTermSignedWithOlderVersion_isNotPending() {
+        TermsCatalogVO softTerm = CreditTermDummies.softTerm();
+        UUID olderSoftTermId = UUID.randomUUID();
+
+        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class)) {
+
+            jwtMock.when(() -> JwtTokenUtils.cpfToken(BEARER_TOKEN)).thenReturn(CPF_PLAIN);
+
+            when(termsCatalogRepository.findLatestActiveByProduct(PRODUCT))
+                    .thenReturn(List.of(softTerm));
+            when(customerConsentRepository.getActiveCustomerConsent(CUSTOMER_ID, SOFT_TERM_CODE))
+                    .thenReturn(CustomerConsentDummies.consentWithTermId(olderSoftTermId, SOFT_TERM_CODE));
+            when(creditCoreMapper.toPendingTermVO(anyList()))
+                    .thenReturn(Collections.emptyList());
+
+            ArgumentCaptor<ActiveConsentResponseVO> voCaptor =
+                    ArgumentCaptor.forClass(ActiveConsentResponseVO.class);
+            when(creditCoreMapper.toActiveConsentResponseDTO(voCaptor.capture()))
+                    .thenReturn(ActiveConsentResponseDTO.builder().build());
+
+            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", "customer-1");
+
+            ActiveConsentResponseVO captured = voCaptor.getValue();
+            assertThat(captured.getHasPendingMandatoryTerms()).isFalse();
+            assertThat(captured.getPendingTerms()).isEmpty();
+        }
+    }
+
+    @Test
+    void getPendingTerms_hardTermSignedWithOlderVersion_remainsPending() {
+        TermsCatalogVO revokedTerm = CreditTermDummies.revokedTerm();
+        UUID olderRevokedTermId = UUID.randomUUID();
+        PendingTermVO pendingMandatoryTermVO = PendingTermVO.builder()
+                .termId(REVOKED_TERM_ID.toString())
+                .termCode(REVOKED_TERM_CODE)
+                .contentSummary(revokedTerm.getContentSummary())
+                .isMandatory(true)
+                .build();
+
+        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class)) {
+
+            jwtMock.when(() -> JwtTokenUtils.cpfToken(BEARER_TOKEN)).thenReturn(CPF_PLAIN);
+
+            when(termsCatalogRepository.findLatestActiveByProduct(PRODUCT))
+                    .thenReturn(List.of(revokedTerm));
+            when(customerConsentRepository.getActiveCustomerConsent(CUSTOMER_ID, REVOKED_TERM_CODE))
+                    .thenReturn(CustomerConsentDummies.consentWithTermId(olderRevokedTermId, REVOKED_TERM_CODE));
+            when(creditCoreMapper.toPendingTermVO(anyList()))
+                    .thenReturn(List.of(pendingMandatoryTermVO));
+
+            ArgumentCaptor<ActiveConsentResponseVO> voCaptor =
+                    ArgumentCaptor.forClass(ActiveConsentResponseVO.class);
+            when(creditCoreMapper.toActiveConsentResponseDTO(voCaptor.capture()))
+                    .thenReturn(ActiveConsentResponseDTO.builder().build());
+
+            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", "customer-1");
+
+            ActiveConsentResponseVO captured = voCaptor.getValue();
+            assertThat(captured.getHasPendingMandatoryTerms()).isTrue();
+            assertThat(captured.getPendingTerms()).hasSize(1);
+        }
+    }
+
+    @Test
+    void getPendingTerms_duplicateVigenteVersionsSameTermCode_reducesToLatest() {
+        TermsCatalogVO softTerm = CreditTermDummies.softTerm();
+        TermsCatalogVO olderVersion = TermsCatalogVO.builder()
+                .id(UUID.randomUUID())
+                .product(softTerm.getProduct())
+                .termCode(softTerm.getTermCode())
+                .title(softTerm.getTitle())
+                .version("1.0")
+                .isMandatory(softTerm.getIsMandatory())
+                .revokePreviousVersions(softTerm.getRevokePreviousVersions())
+                .contentSummary(softTerm.getContentSummary())
+                .build();
+        TermsCatalogVO newerVersion = TermsCatalogVO.builder()
+                .id(UUID.randomUUID())
+                .product(softTerm.getProduct())
+                .termCode(softTerm.getTermCode())
+                .title(softTerm.getTitle())
+                .version("2.0")
+                .isMandatory(softTerm.getIsMandatory())
+                .revokePreviousVersions(softTerm.getRevokePreviousVersions())
+                .contentSummary(softTerm.getContentSummary())
+                .build();
+
+        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class)) {
+
+            jwtMock.when(() -> JwtTokenUtils.cpfToken(BEARER_TOKEN)).thenReturn(CPF_PLAIN);
+
+            when(termsCatalogRepository.findLatestActiveByProduct(PRODUCT))
+                    .thenReturn(List.of(olderVersion, newerVersion));
+            when(customerConsentRepository.getActiveCustomerConsent(CUSTOMER_ID, SOFT_TERM_CODE))
+                    .thenReturn(null);
+
+            ArgumentCaptor<List<TermsCatalogVO>> pendingTermsCaptor = ArgumentCaptor.forClass(List.class);
+            when(creditCoreMapper.toPendingTermVO(pendingTermsCaptor.capture()))
+                    .thenReturn(Collections.emptyList());
+            when(creditCoreMapper.toActiveConsentResponseDTO(any()))
+                    .thenReturn(ActiveConsentResponseDTO.builder().build());
+
+            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", "customer-1");
+
+            List<TermsCatalogVO> pendingTerms = pendingTermsCaptor.getValue();
+            assertThat(pendingTerms).hasSize(1);
+            assertThat(pendingTerms.get(0).getVersion()).isEqualTo("2.0");
         }
     }
 }

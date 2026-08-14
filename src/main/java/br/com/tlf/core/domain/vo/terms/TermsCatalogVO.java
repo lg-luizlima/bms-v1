@@ -17,6 +17,7 @@ public class TermsCatalogVO {
     private UUID id;
     private String product;
     private String termCode;
+    private String title;
     private String version;
     private Boolean isMandatory;
     private Integer validityDays;

@@ -25,6 +25,9 @@ public class PendingTermDTO implements Serializable {
     @JsonProperty("termCode")
     private String termCode;
 
+    @JsonProperty("title")
+    private String title;
+
     @JsonProperty("contentSummary")
     private String contentSummary;
 
