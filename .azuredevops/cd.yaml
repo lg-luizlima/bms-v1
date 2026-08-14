@@ -26,5 +26,6 @@ extends:
   template: /tech_products/fintech/pipeline/cd/deploy-helm/vvpp.yaml@CodePlay 
   parameters:
     variableGroupName: ms-vivopay-credit-consent-bms-v1
-    helmChartName: generic-java-microservice
-    helmChartVersion: 1.0.30
+    helmChartName: generic-java-debezium
+    helmRepoName: helm/ccvp
+    helmChartVersion: 1.0.2
