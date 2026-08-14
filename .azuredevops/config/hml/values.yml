@@ -258,3 +258,21 @@ volumeMounts:
 #  mountPath: /my_volume
 #- name: my-volume-2
 #  mountPath: /my_volume_2
+
+
+debezium:
+  enabled: true
+  serverName: postgres-cdc-credit-consent-bms-v1
+
+  kafka:
+    bootstrapServers: "pkc-12pd3.brazilsouth.azure.confluent.cloud:9092"
+
+  database:
+    host: sql-credit-consent-test.postgres.database.azure.com
+    port: 5432
+    name: db_credit_consent
+
+  publicationName: dbz_publication
+  slotName: debezium_slot
+  topicPrefix: test.debezium
+  tableIncludeList: public.outbox_event
