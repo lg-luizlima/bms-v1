@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cd docker-compose && docker-compose up -d
 
 # Start CDC stack for Outbox + Debezium (PostgreSQL:5433, Kafka:9092, Connect:8083, Kafka UI:8080)
-docker compose -f debezium-docker-compose.yaml up -d
+docker compose -f debezium/debezium-docker-compose.yaml up -d
 ```
 
 Server runs on port **8082** by default. Swagger UI available at `/swagger-ui.html`.
@@ -36,8 +36,14 @@ Current transition architecture:
 
 ### Local CDC assets
 
-- `debezium-docker-compose.yaml` — local PostgreSQL + Kafka + Debezium Connect + Kafka UI.
-- `debezium.json` — connector config for `credit_consent.tb_outbox_events`.
+All Debezium/Kafka Connect config lives in `debezium/` (see `debezium/README.md` — local env
+setup + guide for configuring the equivalent connector in HML/prod; every new outbox-routed
+topic, even one owned by another service like the worker, needs its connector config added
+here too, since this repo owns provisioning the Debezium listener in every environment):
+
+- `debezium/debezium-docker-compose.yaml` — local PostgreSQL + Kafka + Debezium Connect + Kafka UI.
+- `debezium/debezium.json` — connector config for `credit_consent.tb_outbox_events` (this repo's own outbox).
+- `debezium/debezium-worker-outbox.json` — connector config for `credit_consent_worker.tb_outbox_events` (`ms-vivopay-credit-consent-worker-v1`'s own outbox, → `vivopay.credit.engine.events.v1`).
 
 ### Event Hub parallel mode
 
@@ -54,7 +60,7 @@ When this flag is `false`, app still writes outbox and Debezium remains the prim
 `CreditCoreServiceImpl.currentTraceParent()` captures the current span's W3C `traceparent`
 (via injected `Tracer`/`Propagator`) into `tb_outbox_events.trace_context` in the same
 transaction as the outbox write. Debezium's outbox `EventRouter` promotes that column to a
-Kafka header (`debezium.json`'s `transforms.outbox.table.fields.additional.placement`,
+Kafka header (`debezium/debezium.json`'s `transforms.outbox.table.fields.additional.placement`,
 `trace_context:header:traceparent`). The worker's `KafkaConsumerConfig`/`KafkaProducerConfig`
 have `ContainerProperties`/`KafkaTemplate.setObservationEnabled(true)` +
 `setObservationRegistry(...)`, so Spring Kafka auto-extracts/injects that header — Kafka
@@ -88,7 +94,7 @@ to put the real OTel trace id (not a random UUID) into every `ProblemDetailRespo
 
 ### Local observability stack
 
-`debezium-docker-compose.yaml` (this repo) brings up `otel-collector` (4317 grpc / 4318 http),
+`debezium/debezium-docker-compose.yaml` (this repo) brings up `otel-collector` (4317 grpc / 4318 http),
 `tempo` (3200), `jaeger` (16686), `loki` (3100), `prometheus` (9090, scrapes all 3 apps via
 `host.docker.internal:{8082,8089,8084}/actuator/prometheus`), `grafana` (3000, anonymous
 admin). Query a trace via Grafana's Tempo datasource, or directly:
@@ -186,7 +192,7 @@ The service manages versioned **terms catalogs** per product (e.g. `EP_INSS`) an
 
 Schema is owned exclusively by **Flyway** (`src/main/resources/db/migration/V{n}__{description}.sql`), not Hibernate `ddl-auto` — `spring.jpa.hibernate.ddl-auto` is set to `validate` everywhere (Hibernate checks the entities match the Flyway-managed schema at boot but never alters it). This is a deliberate choice: JPA is the runtime data-access layer, but schema evolution stays entirely in versioned SQL migration files, not annotation-driven auto-generation.
 
-Schema lives in its own dedicated Postgres schema, `credit_consent` (not `public`) — set via `?currentSchema=credit_consent` in `BMS_DATABASE_URL` plus `spring.flyway.schemas`/`create-schemas: true`. `debezium.json`'s `table.include.list` (`credit_consent.tb_outbox_events`) must stay in sync if this schema name ever changes.
+Schema lives in its own dedicated Postgres schema, `credit_consent` (not `public`) — set via `?currentSchema=credit_consent` in `BMS_DATABASE_URL` plus `spring.flyway.schemas`/`create-schemas: true`. `debezium/debezium.json`'s `table.include.list` (`credit_consent.tb_outbox_events`) must stay in sync if this schema name ever changes.
 
 **⚠️ Every persistence change needs a new Flyway migration — never edit an applied one.** This covers both schema changes (new/altered columns, tables, indexes) and **data changes required by a new business rule** — e.g., adding a new product means a new `V{n}__seed_tb_terms_<product>.sql` inserting its `tb_terms` rows (see `V2__seed_tb_terms_consignado_dataprev.sql` for the pattern), not a manual `INSERT` run by hand against dev/hml/prod. Flyway checksums applied migrations; editing one that already ran in any environment breaks validation there. Add a new `V{n+1}__` file instead. The same rule applies to `ms-vivopay-credit-consent-worker-v1` (`src/main/resources/db/migration/`) for its own tables (`tb_processed_events`).
 
