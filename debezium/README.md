@@ -38,6 +38,21 @@ docker compose -f debezium/debezium-docker-compose.yaml up connect-init
 
 **Ordem importa**: os dois connectors só registram com sucesso depois que a tabela outbox correspondente já existe no Postgres (criada pelo Flyway da aplicação dona dela). Por isso o BMS e o worker precisam estar de pé (`spring-boot:run`, que roda o Flyway no boot) antes de rodar `connect-init` — registrar antes disso falha com `No table filters found for filtered publication`.
 
+### Acesso rápido às UIs — nenhuma pede login
+
+Um único `docker compose -f debezium/debezium-docker-compose.yaml up -d` sobe tudo — não existe
+mais um passo separado de "infra básica" antes deste. Todas as interfaces web abrem direto, sem
+tela de login:
+
+| Ferramenta | URL | Observação |
+|---|---|---|
+| Grafana | http://localhost:3000 | acesso anônimo como Admin (`GF_AUTH_ANONYMOUS_ENABLED`) |
+| Kafka UI | http://localhost:8080 | sem autenticação configurada |
+| pgAdmin | http://localhost:5051 | modo desktop (`PGADMIN_CONFIG_SERVER_MODE: 'False'`), sem tela de login; a conexão com o Postgres local já vem pré-cadastrada (só pede a senha `postgres` ao expandir a árvore do servidor, isso é a senha do Postgres, não um login do pgAdmin) |
+| RedisInsight | http://localhost:8001 | conexão com o Redis local já vem pré-configurada via `RI_REDIS_HOST`/`RI_REDIS_PORT`, EULA aceito via `RI_ACCEPT_TERMS_AND_CONDITIONS` |
+| Jaeger | http://localhost:16686 | sem autenticação |
+| Debezium Connect (REST) | http://localhost:8083/connectors | sem autenticação |
+
 ## Guardrails (mesmos de `../infra_aks_debezium.md`)
 
 1. Nunca reusar `slot.name`/`publication.name` entre connectors diferentes.
@@ -49,14 +64,16 @@ docker compose -f debezium/debezium-docker-compose.yaml up connect-init
 O serviço `debezium` do compose usa `build: context: .` (esta pasta) para gerar a imagem `ms-vivopay-credit-consent-debezium-avro:2.7.0.Final`, a partir do `Dockerfile` desta pasta:
 
 ```dockerfile
-FROM confluentinc/cp-kafka-connect-base:7.6.1
+FROM confluentinc/cp-kafka-connect:8.2.3
 
-RUN confluent-hub install --no-prompt confluentinc/kafka-connect-avro-converter:7.6.1 && \
-    confluent-hub install --no-prompt debezium/debezium-connector-postgresql:2.5.4-2
+RUN confluent-hub install --no-prompt confluentinc/kafka-connect-avro-converter:8.2.3 && \
+    confluent-hub install --no-prompt debezium/debezium-connector-postgresql:3.2.6-2
 ```
 
-Base `confluentinc/cp-kafka-connect-base` (mesma versão `7.6.1` já usada no `schema-registry` do compose) em vez da imagem oficial da Debezium, porque a Confluent já traz o CLI `confluent-hub` pronto — os dois componentes que realmente precisamos (o connector Postgres da Debezium e o conversor Avro da Confluent, exigido por `value.converter: io.confluent.connect.avro.AvroConverter` nos dois `debezium-*.json`) são baixados do Confluent Hub em tempo de build, sem depender de nenhum artefato local. Só instalamos o connector Postgres — a imagem oficial da Debezium viria com 9 connectors (MySQL, MongoDB, SQL Server, Oracle, DB2, Spanner, Vitess, Informix, IBM i) que não usamos.
+Base `confluentinc/cp-kafka-connect` (mesma versão `8.2.3` já usada no `kafka`/`schema-registry` do compose — a Confluent recomenda manter todos os componentes de uma stack na mesma versão de Confluent Platform) em vez da imagem oficial da Debezium, porque a Confluent já traz o CLI `confluent-hub` pronto — os dois componentes que realmente precisamos (o connector Postgres da Debezium e o conversor Avro da Confluent, exigido por `value.converter: io.confluent.connect.avro.AvroConverter` nos dois `debezium-*.json`) são baixados do Confluent Hub em tempo de build, sem depender de nenhum artefato local. Só instalamos o connector Postgres — a imagem oficial da Debezium viria com 9 connectors (MySQL, MongoDB, SQL Server, Oracle, DB2, Spanner, Vitess, Informix, IBM i) que não usamos.
 
-**⚠️ Versão do connector presa em `2.5.4-2` (não é a mais recente do Confluent Hub) por causa do Java da imagem base**: `cp-kafka-connect-base:7.6.1` roda em Java 11. A partir da linha 3.0, o connector Postgres da Debezium passou a exigir Java 17 (os jars vêm compilados com class file version 61, que uma JVM 11 rejeita com `UnsupportedClassVersionError` — o plugin carrega o classloader mas nenhuma classe do connector é utilizável, e o registro do connector falha com HTTP 500 "Failed to find any class that implements Connector"). `2.5.4-2` é a versão mais recente da linha 2.x publicada no Confluent Hub, compatível com Java 11. Para usar uma versão 3.x do connector, a imagem base precisaria subir para uma versão do Confluent Platform que já rode em Java 17.
+`cp-kafka-connect` (não `cp-kafka-connect-base`) — a variante `-base` foi descontinuada a partir da Confluent Platform 8.3.0 e será removida na 8.4.0; a Confluent recomenda `cp-kafka-connect` como substituição direta (hoje funcionalmente idêntica).
+
+**Por que `8.2.3` e não a versão mais recente da Confluent Platform (`8.3.x`)**: a partir da CP 8.3.0 as imagens base passaram a rodar em Java 25 por padrão, mas a própria Confluent documenta que conectores "não são certificados no Java 25" e recomenda Java 21 mesmo em CP 8.3.x. `8.2.x` é a última linha cujas imagens já vêm com Java 21 (Temurin 21) por padrão — o ponto certo entre "versão recente" e "certificada para connectors". Com Java 21 disponível, o connector Postgres da Debezium pôde voltar para a versão mais recente da linha 3.x publicada no Confluent Hub (`3.2.6-2`) — versões 3.x exigem Java 17+ em runtime (Java 11, usado pela antiga base `cp-kafka-connect-base:7.6.1`, rejeitava esses jars com `UnsupportedClassVersionError`).
 
 Como a base muda de "imagem Debezium" para "imagem Confluent", as variáveis de ambiente do serviço `debezium` no compose usam o prefixo `CONNECT_` (convenção das imagens `cp-kafka-connect*`), não os nomes sem prefixo que a imagem da Debezium aceitaria.

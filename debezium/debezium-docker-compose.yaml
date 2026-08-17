@@ -21,13 +21,18 @@ services:
       - "6379:6379"
 
   redis-insight:
-    image: redislabs/redisinsight:1.14.0
+    image: redis/redisinsight:latest
     container_name: redis_insight
     restart: unless-stopped
     ports:
-      - "8001:8001"
+      - "8001:5540"
+    environment:
+      RI_ACCEPT_TERMS_AND_CONDITIONS: "true"
+      RI_REDIS_HOST: redis
+      RI_REDIS_PORT: 6379
+      RI_REDIS_ALIAS: "ms-vivopay-credit-consent (local)"
     volumes:
-      - redis_insight_volume_data:/db
+      - redis_insight_volume_data:/data
     depends_on:
       - redis
 
@@ -39,10 +44,14 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@local.com
       PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    volumes:
+      - ./pgadmin-servers.json:/pgadmin4/servers.json:ro
     restart: unless-stopped
 
   kafka:
-    image: confluentinc/cp-kafka:7.6.1
+    image: confluentinc/cp-kafka:8.2.3
     container_name: kafka
     hostname: kafka
     ports:
@@ -75,7 +84,7 @@ services:
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
 
   schema-registry:
-    image: confluentinc/cp-schema-registry:7.6.1
+    image: confluentinc/cp-schema-registry:8.2.3
     container_name: schema-registry
     hostname: schema-registry
     depends_on:

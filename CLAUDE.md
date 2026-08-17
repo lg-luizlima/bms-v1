@@ -15,10 +15,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Run with a specific profile
 ./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=dev"
 
-# Start local infrastructure (PostgreSQL:5433, Redis:6379, Kafka:9092)
-cd docker-compose && docker-compose up -d
-
-# Start CDC stack for Outbox + Debezium (PostgreSQL:5433, Kafka:9092, Connect:8083, Kafka UI:8080)
+# Start ALL local infrastructure — PostgreSQL:5433, Redis:6379, Kafka:9092, Schema
+# Registry:8081, Debezium Connect:8083, Kafka UI:8080, plus observability (Grafana:3000,
+# Jaeger:16686, Prometheus:9090) and admin UIs (pgAdmin:5051, RedisInsight:8001) — one compose
+# file, no separate "basic infra" step, no login required on any of the web UIs.
 docker compose -f debezium/debezium-docker-compose.yaml up -d
 ```
 
