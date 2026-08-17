@@ -278,4 +278,7 @@ debezium:
   topicPrefix: test.debezium
   tableIncludeList: credit_consent.tb_outbox_events
 
-  valueFormat: avro
+  # TEMPORÁRIO: json em vez de avro pra isolar se o crash (NullPointerException em
+  # DebeziumServer.configToProperties) é causado pelo format.value=avro nessa imagem/versão do
+  # Debezium Server. Ver seção D do plano. Reverter pra avro assim que confirmado.
+  valueFormat: json
