@@ -271,12 +271,12 @@ debezium:
     host: sql-test-fintech.postgres.database.azure.com
     port: 5432
     name: sql-pixparcel-test
-    schema: credit_consent
+    schema: "credit_consent,credit_consent_worker"
 
   publicationName: credit_consent_bms_outbox_publication
   slotName: credit_consent_bms_outbox_slot
   topicPrefix: test.debezium
-  tableIncludeList: credit_consent.tb_outbox_events
+  tableIncludeList: credit_consent.tb_outbox_events,credit_consent_worker.tb_outbox_events
 
   # TEMPORÁRIO: json em vez de avro pra isolar se o crash (NullPointerException em
   # DebeziumServer.configToProperties) é causado pelo format.value=avro nessa imagem/versão do
