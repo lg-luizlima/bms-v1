@@ -271,8 +271,11 @@ debezium:
     host: sql-credit-consent-test.postgres.database.azure.com
     port: 5432
     name: db_credit_consent
+    schema: credit_consent
 
-  publicationName: dbz_publication
-  slotName: debezium_slot
+  publicationName: credit_consent_bms_outbox_publication
+  slotName: credit_consent_bms_outbox_slot
   topicPrefix: test.debezium
-  tableIncludeList: public.outbox_event
+  tableIncludeList: credit_consent.tb_outbox_events
+
+  valueFormat: avro
