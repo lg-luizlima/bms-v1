@@ -268,9 +268,9 @@ debezium:
     bootstrapServers: "pkc-12pd3.brazilsouth.azure.confluent.cloud:9092"
 
   database:
-    host: sql-test-fintech.postgres.database.azure.com
+    host: sql-credit-consent.postgres.database.azure.com
     port: 5432
-    name: sql-pixparcel-test
+    name: sql-credit-consent
     schema: "credit_consent,credit_consent_worker"
 
   publicationName: credit_consent_bms_outbox_publication
