@@ -6,5 +6,3 @@ env:
   value: 128m
 - name: JAVA_OPTS_METASPACE_MAX
   value: 384m
-- name: DATABASE_SCHEMA
-  value: credit_consent

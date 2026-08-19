@@ -59,8 +59,7 @@ spring:
     name: ms-vivopay-credit-consent-bms
   datasource:
     base-url: ${DATABASE_URL}
-    schema: ${DATABASE_SCHEMA}
-    url: ${spring.datasource.base-url}?currentSchema=${spring.datasource.schema}
+    url: ${spring.datasource.base-url}
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -73,12 +72,9 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-      default_schema: ${spring.datasource.schema}
 
   flyway:
     enabled: true
-    schemas: ${DATABASE_SCHEMA}
-    create-schemas: true
     locations: classpath:db/migration
   data:
     redis:
