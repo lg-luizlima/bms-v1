@@ -75,9 +75,10 @@ spring:
 
   flyway:
     enabled: true
-    url: ${BMS_DATABASE_URL:${spring.datasource.base-url}}
-    user: ${BMS_DATABASE_USERNAME}
-    password: ${BMS_DATABASE_PASSWORD}
+    table: flyway_schema_history_bms
+    url: ${DATABASE_URL:${spring.datasource.base-url}}
+    user: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
     baseline-on-migrate: true
     baseline-version: 0
     locations: classpath:db/migration

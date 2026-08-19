@@ -54,10 +54,10 @@ spring:
   application:
     name: ms-vivopay-credit-consent-bms
   datasource:
-    base-url: ${BMS_DATABASE_BASE_URL:jdbc:postgresql://localhost:5433/credit_consent}
-    url: ${BMS_DATABASE_URL:${spring.datasource.base-url}}
-    username: ${BMS_DATABASE_USERNAME:postgres}
-    password: ${BMS_DATABASE_PASSWORD:postgres}
+    base-url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/credit_consent}
+    url: ${DATABASE_URL:${spring.datasource.base-url}}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   jpa:
     open-in-view: false
@@ -70,6 +70,7 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   flyway:
     enabled: true
+    table: flyway_schema_history_bms
     url: ${BMS_DATABASE_URL:${spring.datasource.base-url}}
     user: ${BMS_DATABASE_USERNAME:postgres}
     password: ${BMS_DATABASE_PASSWORD:postgres}
