@@ -283,3 +283,5 @@ debezium:
   extraEnvVars:
     - name: EXTRA_CONNECTOR
       value: cassandra-5
+  # Imagem customizada com o Confluent Avro Converter no classpath — necessário pra valueFormat:
+  #image: "<SEU_ACR>.azurecr.io/debezium-server:3.6-confluent"
