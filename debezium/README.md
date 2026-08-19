@@ -9,7 +9,7 @@ Esta pasta reúne toda a configuração do Debezium/Kafka Connect usada pelo `ms
 
 | Arquivo | Connector | O que captura | Tópico de destino |
 |---|---|---|---|
-| `debezium.json` | `credit-consent-outbox-connector` | `credit_consent.tb_outbox_events` (outbox do próprio BMS) | vem da coluna `topic_name` de cada linha — hoje sempre `vivopay.credit.consent.events.v1` |
+| `debezium.json` | `credit-consent-outbox-connector` | `public.tb_outbox_events` (outbox do próprio BMS) | vem da coluna `topic_name` de cada linha — hoje sempre `vivopay.credit.consent.events.v1` |
 | `debezium-worker-outbox.json` | `credit-consent-worker-outbox-connector` | `credit_consent_worker.tb_outbox_events` (outbox do `ms-vivopay-credit-consent-worker-v1`) | vem da coluna `topic_name` — hoje sempre `vivopay.credit.engine.events.v1` (evento `RefreshOffersEvent`) |
 | `debezium-docker-compose.yaml` | — | stack local completa (Postgres, Kafka, Schema Registry, Kafka Connect, observabilidade) | — |
 
