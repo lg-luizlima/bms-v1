@@ -75,6 +75,11 @@ spring:
 
   flyway:
     enabled: true
+    url: ${BMS_DATABASE_URL:${spring.datasource.base-url}}
+    user: ${BMS_DATABASE_USERNAME}
+    password: ${BMS_DATABASE_PASSWORD}
+    baseline-on-migrate: true
+    baseline-version: 0
     locations: classpath:db/migration
   data:
     redis:
