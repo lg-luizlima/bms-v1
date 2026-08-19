@@ -28,4 +28,4 @@ extends:
     variableGroupName: ms-vivopay-credit-consent-bms-v1
     helmChartName: generic-java-debezium
     helmRepoName: helm/ccvp
-    helmChartVersion: 1.0.10
+    helmChartVersion: 1.0.11
