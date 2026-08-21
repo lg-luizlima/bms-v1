@@ -181,7 +181,7 @@ The consent + outbox write is wrapped in a single transaction via `TransactionTe
 
 ### Domain model
 
-The service manages versioned **terms catalogs** per product (e.g. `EP_INSS`) and records customer **consents** (accepted terms + audit signature). cpf are not hashed anywhere (repository lookups, Redis keys) lib-fintech-logs leads with de security problem . Consent events are published to Azure Event Hub using the **outbox pattern** (`tb_outbox_events` table, consumed by Debezium CDC). Redis (`StringRedisTemplate`) caches processing status during consent creation with key `sync_status:{cpf}`.
+The service manages versioned **terms catalogs** per product (e.g. `EP_INSS`) and records customer **consents** (accepted terms + audit signature). cpf are not hashed anywhere (repository lookups, Redis keys) lib-fintech-logs leads with de security problem . Consent events are published to Azure Event Hub using the **outbox pattern** (`tb_outbox_events` table, consumed by Debezium CDC). Redis (`StringRedisTemplate`) caches processing status during consent creation with key `sync_status:{cpf}` (TTL configurável via `SYNC_STATUS_TTL_REDIS`, default 86400s) e a resposta idempotente do POST `/consents` com key `post_consent_idempotency:{cpf}:{correlationId}` (TTL via `CONSENT_IDEMPOTENCY_CHECK_TTL_REDIS`, default 60s). Ambos os TTLs são lidos de `redis.ttl.*` nos `application-*.yml` — nunca reusar `ApplicationConstants.MAX_VALIDITY_DAYS`, que é regra de negócio (validade de termos), como TTL de cache.
 
 **JPA entities** (`infrastructure/persistence/postgresql/entity/`):
 - `CustomerConsentJpaEntity` — cpf (64-char), termCode, termId (FK, plain UUID column, no relation), optIn, acceptedAt, expiresAt, auditDetails (`@JdbcTypeCode(SqlTypes.JSON)` → Postgres `jsonb`, mapped as `String`)
@@ -233,6 +233,13 @@ Default profile is `local`. Production profiles (`dev`, `hml`, `prod`) require:
 | `SPRING_PROFILES_ACTIVE` | Active profile |
 | `EVENTHUB_CONNECTION_STRING` | Azure Event Hub connection |
 | `EVENTHUB_NAME` | Azure Event Hub name |
+| `SYNC_STATUS_TTL_REDIS` | TTL (segundos) da chave Redis `sync_status:{cpf}` — default `86400` |
+| `CONSENT_IDEMPOTENCY_CHECK_TTL_REDIS` | TTL (segundos) da chave Redis `post_consent_idempotency:{cpf}:{correlationId}` — default `60` |
+
+Os TTLs de Redis são declarados nos `secrets` de cada ambiente
+(`.azuredevops/config/{dev,hml,prod}/secrets.{yaml,yml}`) via marcadores `$(SYNC_STATUS_TTL_REDIS_DEV)` /
+`$(CONSENT_IDEMPOTENCY_CHECK_TTL_REDIS_DEV)` (e equivalentes `_HML`/`_PROD`), portanto as variáveis precisam existir
+na Secret Library do Azure DevOps. No perfil `local` valem os defaults do `application-local.yml`.
 
 ## Key Dependencies
 

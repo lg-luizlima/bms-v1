@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -16,11 +17,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ConsentIdempotencyChecker {
 
-    private static final long IDEMPOTENCY_TTL_SECONDS = 60L;
-
     private final StringRedisTemplate redisTemplate;
     private final ObservationRegistry observationRegistry;
     private final ObservabilityPiiProperties observabilityPiiProperties;
+
+    @Value("${redis.ttl.consent-idempotency-check-seconds:60}")
+    private long idempotencyTtlSeconds = 60L;
 
     public Optional<Instant> findCachedResponse(String cpf, String correlationId) {
         String redisKey = idempotencyKey(cpf, correlationId);
@@ -53,7 +55,7 @@ public class ConsentIdempotencyChecker {
         }
 
         redisWriteObservation.observe(() ->
-                redisTemplate.opsForValue().set(redisKey, redisValue, IDEMPOTENCY_TTL_SECONDS, TimeUnit.SECONDS));
+                redisTemplate.opsForValue().set(redisKey, redisValue, idempotencyTtlSeconds, TimeUnit.SECONDS));
     }
 
     private String idempotencyKey(String cpf, String correlationId) {

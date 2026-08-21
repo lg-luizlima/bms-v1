@@ -8,7 +8,6 @@ import static br.com.tlf.dummies.CreditTermDummies.SOFT_TERM_CODE;
 import static br.com.tlf.dummies.CreditTermDummies.SOFT_TERM_ID;
 import static br.com.tlf.dummies.ConsentRequestDummies.BEARER_TOKEN;
 import static br.com.tlf.dummies.ConsentRequestDummies.CPF_PLAIN;
-import static br.com.tlf.shared.constants.ApplicationConstants.MAX_VALIDITY_DAYS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -141,7 +140,7 @@ class CreditCoreServiceImplTest {
             verify(eventHubPort).sendEvent(any());
             verify(customerConsentRepository).saveConsent(consentVO);
             verify(outboxEventQueueRepository).save(outboxVO);
-            verify(valueOperations).set("sync_status:" + CUSTOMER_ID, "PROCESSING", MAX_VALIDITY_DAYS, TimeUnit.DAYS);
+            verify(valueOperations).set("sync_status:" + CUSTOMER_ID, "PROCESSING", 86400L, TimeUnit.SECONDS);
             verify(consentIdempotencyChecker).cacheResponse(eq(CUSTOMER_ID), eq("correlation-1"), any());
         }
     }
@@ -221,7 +220,7 @@ class CreditCoreServiceImplTest {
             verify(eventHubPort).sendEvent(any());
             verify(customerConsentRepository, never()).saveConsent(any());
             verify(outboxEventQueueRepository, never()).save(any());
-            verify(valueOperations).set("sync_status:" + CUSTOMER_ID, "PROCESSING", MAX_VALIDITY_DAYS, TimeUnit.DAYS);
+            verify(valueOperations).set("sync_status:" + CUSTOMER_ID, "PROCESSING", 86400L, TimeUnit.SECONDS);
         }
     }
 
