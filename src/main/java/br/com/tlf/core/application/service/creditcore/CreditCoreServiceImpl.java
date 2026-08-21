@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -123,8 +124,13 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                                         .highCardinalityKeyValue("redis.value", redisValue);
                 }
 
-                redisWriteObservation.observe(() ->
-                                redisTemplate.opsForValue().set(redisKey, redisValue, syncStatusTtlSeconds, TimeUnit.SECONDS));
+                try {
+                        redisWriteObservation.observe(() ->
+                                        redisTemplate.opsForValue().set(redisKey, redisValue, syncStatusTtlSeconds, TimeUnit.SECONDS));
+                } catch (DataAccessException ex) {
+                        log.warn("[writeSyncStatus] Redis unavailable, sync status not cached for customerId: {}: {}",
+                                        customerId, ex.getMessage());
+                }
         }
 
         private void publishEventHubIfEnabled(ConsentRequestDTO requestDTO) {

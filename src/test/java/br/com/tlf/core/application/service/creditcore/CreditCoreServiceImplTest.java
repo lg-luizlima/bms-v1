@@ -12,8 +12,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -36,6 +39,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.transaction.TransactionStatus;
@@ -133,7 +137,7 @@ class CreditCoreServiceImplTest {
                     .thenReturn(outboxVO);
             when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm(), "channel-1", "correlation-1", "customer-1");
+            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm(), "channel-1", "correlation-1", null);
 
             assertThat(response).isNotNull();
             assertThat(response.getConsentReceivedAt()).isNotNull();
@@ -142,6 +146,48 @@ class CreditCoreServiceImplTest {
             verify(outboxEventQueueRepository).save(outboxVO);
             verify(valueOperations).set("sync_status:" + CUSTOMER_ID, "PROCESSING", 86400L, TimeUnit.SECONDS);
             verify(consentIdempotencyChecker).cacheResponse(eq(CUSTOMER_ID), eq("correlation-1"), any());
+        }
+    }
+
+    @Test
+    void createConsent_whenRedisSyncStatusWriteFails_stillPersistsAndReturnsResponse() throws Exception {
+        TermsCatalogVO revokedTerm = CreditTermDummies.revokedTerm();
+        ConsentRequestVO requestVO = ConsentRequestDummies.consentRequestVO();
+        CustomerConsentVO consentVO = CustomerConsentDummies.revokedTermConsent();
+        OutBoxEventQueueVO outboxVO = OutBoxEventQueueVO.builder()
+                .aggregateId(CUSTOMER_ID)
+                .payload("{}")
+                .build();
+
+        try (MockedStatic<JwtTokenUtils> jwtMock = mockStatic(JwtTokenUtils.class)) {
+
+            jwtMock.when(() -> JwtTokenUtils.cpfToken(BEARER_TOKEN)).thenReturn(CPF_PLAIN);
+
+            stubTransactionTemplateToRunLambda();
+
+            when(creditCoreMapper.toVO(ConsentRequestDummies.requestWithMandatoryTerm(), CUSTOMER_ID))
+                    .thenReturn(requestVO);
+            when(termsCatalogRepository.findLatestActiveByProduct(PRODUCT))
+                    .thenReturn(List.of(revokedTerm));
+            when(customerConsentRepository.getActiveCustomerConsent(CUSTOMER_ID, REVOKED_TERM_CODE))
+                    .thenReturn(null);
+            when(creditCoreMapper.toCustomerConsentVO(
+                    eq(CUSTOMER_ID), eq(requestVO),
+                    eq(ConsentRequestDummies.acceptedRevokedTermVO()), eq(revokedTerm)))
+                    .thenReturn(consentVO);
+            when(jsonSerializer.toJson(any())).thenReturn("{}");
+            when(outBoxEventQueueMapper.toVO(eq(CUSTOMER_ID), any(), any()))
+                    .thenReturn(outboxVO);
+            when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+            doThrow(new RedisConnectionFailureException("Unable to connect to Redis"))
+                    .when(valueOperations).set(anyString(), anyString(), anyLong(), any(TimeUnit.class));
+
+            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm(), "channel-1", "correlation-1", null);
+
+            assertThat(response).isNotNull();
+            assertThat(response.getConsentReceivedAt()).isNotNull();
+            verify(customerConsentRepository).saveConsent(consentVO);
+            verify(outboxEventQueueRepository).save(outboxVO);
         }
     }
 
@@ -156,7 +202,7 @@ class CreditCoreServiceImplTest {
             when(consentIdempotencyChecker.findCachedResponse(CUSTOMER_ID, "correlation-1"))
                     .thenReturn(Optional.of(cachedConsentReceivedAt));
 
-            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm(), "channel-1", "correlation-1", "customer-1");
+            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm(), "channel-1", "correlation-1", null);
 
             assertThat(response.getConsentReceivedAt()).isEqualTo(cachedConsentReceivedAt);
             verify(eventHubPort, never()).sendEvent(any());
@@ -184,7 +230,7 @@ class CreditCoreServiceImplTest {
 
             MandatoryTermNotAcceptedException ex = assertThrows(
                     MandatoryTermNotAcceptedException.class,
-                    () -> underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestMissingMandatoryTerm(), "channel-1", "correlation-1", "customer-1"));
+                    () -> underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestMissingMandatoryTerm(), "channel-1", "correlation-1", null));
 
             assertThat(ex.getErrors()).hasSize(1);
             assertThat(ex.getErrors().get(0)).contains(REVOKED_TERM_CODE);
@@ -213,7 +259,7 @@ class CreditCoreServiceImplTest {
                     .thenReturn(CustomerConsentDummies.consentWithTermId(REVOKED_TERM_ID, REVOKED_TERM_CODE));
             when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm(), "channel-1", "correlation-1", "customer-1");
+            ConsentResponseDTO response = underTest.createConsent(BEARER_TOKEN, ConsentRequestDummies.requestWithMandatoryTerm(), "channel-1", "correlation-1", null);
 
             assertThat(response).isNotNull();
             assertThat(response.getConsentReceivedAt()).isNotNull();
@@ -249,7 +295,7 @@ class CreditCoreServiceImplTest {
             when(creditCoreMapper.toActiveConsentResponseDTO(voCaptor.capture()))
                     .thenReturn(ActiveConsentResponseDTO.builder().build());
 
-            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", "customer-1");
+            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", null);
 
             ActiveConsentResponseVO captured = voCaptor.getValue();
             assertThat(captured.getProduct()).isEqualTo(PRODUCT);
@@ -287,7 +333,7 @@ class CreditCoreServiceImplTest {
             when(creditCoreMapper.toActiveConsentResponseDTO(voCaptor.capture()))
                     .thenReturn(ActiveConsentResponseDTO.builder().build());
 
-            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", "customer-1");
+            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", null);
 
             ActiveConsentResponseVO captured = voCaptor.getValue();
             assertThat(captured.getHasPendingMandatoryTerms()).isTrue();
@@ -324,7 +370,7 @@ class CreditCoreServiceImplTest {
             when(creditCoreMapper.toActiveConsentResponseDTO(voCaptor.capture()))
                     .thenReturn(ActiveConsentResponseDTO.builder().build());
 
-            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", "customer-1");
+            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", null);
 
             ActiveConsentResponseVO captured = voCaptor.getValue();
             assertThat(captured.getHasPendingMandatoryTerms()).isFalse();
@@ -353,7 +399,7 @@ class CreditCoreServiceImplTest {
             when(creditCoreMapper.toActiveConsentResponseDTO(voCaptor.capture()))
                     .thenReturn(ActiveConsentResponseDTO.builder().build());
 
-            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", "customer-1");
+            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", null);
 
             ActiveConsentResponseVO captured = voCaptor.getValue();
             assertThat(captured.getHasPendingMandatoryTerms()).isFalse();
@@ -388,7 +434,7 @@ class CreditCoreServiceImplTest {
             when(creditCoreMapper.toActiveConsentResponseDTO(voCaptor.capture()))
                     .thenReturn(ActiveConsentResponseDTO.builder().build());
 
-            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", "customer-1");
+            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", null);
 
             ActiveConsentResponseVO captured = voCaptor.getValue();
             assertThat(captured.getHasPendingMandatoryTerms()).isTrue();
@@ -435,7 +481,7 @@ class CreditCoreServiceImplTest {
             when(creditCoreMapper.toActiveConsentResponseDTO(any()))
                     .thenReturn(ActiveConsentResponseDTO.builder().build());
 
-            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", "customer-1");
+            underTest.getPendingTerms(BEARER_TOKEN, PRODUCT, "channel-1", "correlation-1", null);
 
             List<TermsCatalogVO> pendingTerms = pendingTermsCaptor.getValue();
             assertThat(pendingTerms).hasSize(1);

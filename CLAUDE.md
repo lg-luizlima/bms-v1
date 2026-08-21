@@ -235,11 +235,30 @@ Default profile is `local`. Production profiles (`dev`, `hml`, `prod`) require:
 | `EVENTHUB_NAME` | Azure Event Hub name |
 | `SYNC_STATUS_TTL_REDIS` | TTL (segundos) da chave Redis `sync_status:{cpf}` — default `86400` |
 | `CONSENT_IDEMPOTENCY_CHECK_TTL_REDIS` | TTL (segundos) da chave Redis `post_consent_idempotency:{cpf}:{correlationId}` — default `60` |
+| `REDIS_SSL` | Liga TLS no Lettuce (`spring.data.redis.ssl.enabled`) — default `true`. Azure Cache for Redis **exige** TLS na porta 6380 |
+| `REDIS_TIMEOUT` | Timeout de comando Redis em ms — default `10000` |
+| `REDIS_CONNECT_TIMEOUT` | Timeout de conexão/handshake Redis em ms — default `5000` |
 
 Os TTLs de Redis são declarados nos `secrets` de cada ambiente
 (`.azuredevops/config/{dev,hml,prod}/secrets.{yaml,yml}`) via marcadores `$(SYNC_STATUS_TTL_REDIS_DEV)` /
 `$(CONSENT_IDEMPOTENCY_CHECK_TTL_REDIS_DEV)` (e equivalentes `_HML`/`_PROD`), portanto as variáveis precisam existir
 na Secret Library do Azure DevOps. No perfil `local` valem os defaults do `application-local.yml`.
+
+`REDIS_SSL`/`REDIS_TIMEOUT`/`REDIS_CONNECT_TIMEOUT` **não** são secrets — ficam em
+`.azuredevops/config/{dev,hml,prod}/environments_variables.yml`. Atenção: a propriedade correta do Boot é
+`spring.data.redis.ssl.enabled` (bloco aninhado `ssl:`); `sslEnabled` **não existe** em `RedisProperties` e é
+silenciosamente ignorado pelo binder — foi exatamente essa a causa do `RedisCommandTimeoutException:
+Connection initialization timed out after 1 minute(s)` em HML (cliente falando texto puro contra a porta TLS 6380).
+
+### Redis é best-effort no `POST /consents`
+
+Redis aqui é apenas cache (idempotência de curta janela e `sync_status`), nunca fonte de verdade. Tanto
+`ConsentIdempotencyChecker` (leitura e escrita) quanto `CreditCoreServiceImpl.writeSyncStatus` capturam
+`org.springframework.dao.DataAccessException` (superclasse de `RedisConnectionFailureException`,
+`RedisSystemException` e `QueryTimeoutException`), logam em `WARN` e seguem o fluxo: leitura vira cache miss,
+escrita é descartada. As `Observation` continuam marcando o span como erro antes do catch. Trade-off aceito:
+com o Redis fora, um replay do mesmo `correlationId` dentro da janela de 60s pode ser processado duas vezes —
+preferível à indisponibilidade total do endpoint, e sinalizado no log de WARN.
 
 ## Key Dependencies
 

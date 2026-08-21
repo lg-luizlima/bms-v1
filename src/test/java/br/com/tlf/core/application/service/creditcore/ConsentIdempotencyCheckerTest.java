@@ -1,6 +1,11 @@
 package br.com.tlf.core.application.service.creditcore;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
@@ -70,5 +76,27 @@ class ConsentIdempotencyCheckerTest {
                 consentReceivedAt.toString(),
                 60L,
                 TimeUnit.SECONDS);
+    }
+
+    @Test
+    void findCachedResponse_whenRedisUnavailable_returnsEmptyInsteadOfPropagating() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("post_consent_idempotency:" + CPF + ":" + CORRELATION_ID))
+                .thenThrow(new RedisConnectionFailureException("Unable to connect to Redis"));
+
+        Optional<Instant> result = underTest.findCachedResponse(CPF, CORRELATION_ID);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void cacheResponse_whenRedisUnavailable_doesNotPropagate() {
+        Instant consentReceivedAt = Instant.parse("2026-08-13T10:00:00Z");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        doThrow(new RedisConnectionFailureException("Unable to connect to Redis"))
+                .when(valueOperations).set(anyString(), anyString(), anyLong(), any(TimeUnit.class));
+
+        assertThatNoException()
+                .isThrownBy(() -> underTest.cacheResponse(CPF, CORRELATION_ID, consentReceivedAt));
     }
 }

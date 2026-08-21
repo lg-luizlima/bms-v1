@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +13,9 @@ import br.com.tlf.shared.observability.ObservabilityPiiProperties;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ConsentIdempotencyChecker {
@@ -35,7 +38,14 @@ public class ConsentIdempotencyChecker {
             redisReadObservation.highCardinalityKeyValue("redis.key", redisKey);
         }
 
-        String cachedValue = redisReadObservation.observe(() -> redisTemplate.opsForValue().get(redisKey));
+        String cachedValue;
+        try {
+            cachedValue = redisReadObservation.observe(() -> redisTemplate.opsForValue().get(redisKey));
+        } catch (DataAccessException ex) {
+            log.warn("[findCachedResponse] Redis unavailable, treating as cache miss (idempotency window not enforced for correlationId: {}): {}",
+                    correlationId, ex.getMessage());
+            return Optional.empty();
+        }
 
         return Optional.ofNullable(cachedValue).map(Instant::parse);
     }
@@ -54,8 +64,13 @@ public class ConsentIdempotencyChecker {
                     .highCardinalityKeyValue("redis.value", redisValue);
         }
 
-        redisWriteObservation.observe(() ->
-                redisTemplate.opsForValue().set(redisKey, redisValue, idempotencyTtlSeconds, TimeUnit.SECONDS));
+        try {
+            redisWriteObservation.observe(() ->
+                    redisTemplate.opsForValue().set(redisKey, redisValue, idempotencyTtlSeconds, TimeUnit.SECONDS));
+        } catch (DataAccessException ex) {
+            log.warn("[cacheResponse] Redis unavailable, idempotency response not cached for correlationId: {}: {}",
+                    correlationId, ex.getMessage());
+        }
     }
 
     private String idempotencyKey(String cpf, String correlationId) {
