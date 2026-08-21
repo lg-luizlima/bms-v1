@@ -1,7 +1,5 @@
 package br.com.tlf.core.application.service.creditcore;
 
-import static br.com.tlf.shared.constants.ApplicationConstants.MAX_VALIDITY_DAYS;
-
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -69,6 +67,8 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
         private final ConsentIdempotencyChecker consentIdempotencyChecker;
         @Value("${features.eventhub.parallel-publish-enabled:true}")
         private boolean eventHubParallelPublishEnabled = true;
+        @Value("${redis.ttl.sync-status-seconds:86400}")
+        private long syncStatusTtlSeconds = 86400L;
 
         @Override
         public ConsentResponseDTO createConsent(String authorization, ConsentRequestDTO requestDTO, String channelId,
@@ -124,7 +124,7 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                 }
 
                 redisWriteObservation.observe(() ->
-                                redisTemplate.opsForValue().set(redisKey, redisValue, MAX_VALIDITY_DAYS, TimeUnit.DAYS));
+                                redisTemplate.opsForValue().set(redisKey, redisValue, syncStatusTtlSeconds, TimeUnit.SECONDS));
         }
 
         private void publishEventHubIfEnabled(ConsentRequestDTO requestDTO) {
