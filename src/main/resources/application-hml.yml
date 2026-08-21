@@ -88,7 +88,9 @@ spring:
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
       timeout: 60000
-      sslEnabled: ${REDIS_SSL:true}
+      ssl:
+        enabled: ${REDIS_SSL:true}
+      
   thread-executor: virtual
 jdbc:
   includes: connection,query
