@@ -7,6 +7,7 @@ package br.com.tlf.core.domain.exception;
 public enum DomainErrorCode {
     BAD_REQUEST(4000),
     MISSING_AUDIT_DATA(4001),
+    INVALID_CPF_PARAMETER(4002),
     PRODUCT_NOT_FOUND(4040),
     INVALID_TERM(4221),
     MANDATORY_TERM_NOT_ACCEPTED(4222),

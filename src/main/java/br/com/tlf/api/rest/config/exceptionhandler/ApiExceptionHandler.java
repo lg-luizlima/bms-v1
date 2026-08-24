@@ -19,6 +19,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import br.com.tlf.api.rest.config.exceptionhandler.model.ErrorDetail;
 import br.com.tlf.api.rest.config.exceptionhandler.model.ProblemDetailResponse;
 import br.com.tlf.core.domain.exception.DomainErrorCode;
+import br.com.tlf.core.domain.exception.InvalidCpfParameterException;
 import br.com.tlf.core.domain.exception.InvalidTermException;
 import br.com.tlf.core.domain.exception.MandatoryTermNotAcceptedException;
 import br.com.tlf.core.domain.exception.MissingAuditDataException;
@@ -100,6 +101,27 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetailResponse body = ProblemDetailResponse.builder()
                 .errorCode(DomainErrorCode.MANDATORY_TERM_NOT_ACCEPTED.getCode())
                 .message("Business Validation Error")
+                .details(ex.getMessage())
+                .timestamp(Instant.now().toString())
+                .traceId(currentTraceId())
+                .errors(toErrorDetails(ex.getErrors()))
+                .build();
+
+        return ResponseEntity.status(status).body(body);
+    }
+
+    @ExceptionHandler(InvalidCpfParameterException.class)
+    public ResponseEntity<ProblemDetailResponse> invalidCpfParameterException(InvalidCpfParameterException ex) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+
+        log.error("[ApiExceptionHandler] invalid cpf parameter: {}", ex.getMessage());
+
+        String stackTrace = ExceptionUtils.getStackTrace(ex);
+        MDC.put("exception", stackTrace.length() > 500 ? stackTrace.substring(0, 500) : stackTrace);
+
+        ProblemDetailResponse body = ProblemDetailResponse.builder()
+                .errorCode(DomainErrorCode.INVALID_CPF_PARAMETER.getCode())
+                .message("Bad Request Error")
                 .details(ex.getMessage())
                 .timestamp(Instant.now().toString())
                 .traceId(currentTraceId())
