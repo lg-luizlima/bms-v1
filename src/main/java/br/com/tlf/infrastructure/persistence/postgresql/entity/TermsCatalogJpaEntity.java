@@ -23,9 +23,6 @@ public class TermsCatalogJpaEntity {
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
 
-    @Column(name = "product", length = 100, nullable = false)
-    private String product;
-
     @Column(name = "term_code", length = 100, nullable = false)
     private String termCode;
 
@@ -61,4 +58,10 @@ public class TermsCatalogJpaEntity {
 
     @Column(name = "end_at")
     private Instant endAt;
+
+    @Column(name = "requires_post_processing", nullable = false)
+    private Boolean requiresPostProcessing;
+
+    @Column(name = "template_id", length = 255)
+    private String templateId;
 }

@@ -14,7 +14,6 @@ import java.util.List;
 public class ConsentRequestVO {
 
     private String customerId;
-    private String product;
     private List<AcceptedTermVO> acceptedTerms;
     private SignatureVO signature;
 }

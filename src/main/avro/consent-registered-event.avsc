@@ -4,9 +4,37 @@
   "namespace": "br.com.tlf.avro.consent",
   "doc": "Value schema for topic vivopay.credit.consent.events.v1. Canonical source: ms-vivopay-credit-consent-bms-v1/src/main/avro/consent-registered-event.avsc — mirrors ConsentEventPayloadVO. Copied verbatim into ms-vivopay-credit-consent-worker-v1 for avro-maven-plugin codegen; keep both files byte-identical.",
   "fields": [
-    { "name": "customerId", "type": "string" },
-    { "name": "termCode", "type": "string" },
+    { "name": "customerId", "type": "string", "doc": "CPF customer identifier related to the consent." },
+    { "name": "termCode", "type": "string", "doc": "Business code of the term accepted by the customer." },
+    { "name": "templateId", "type": "string", "doc": "Identifier of the rendered term template in Carbone." },
     { "name": "termId", "type": "string", "doc": "UUID serialized as string, matching ConsentEventPayloadVO.termId." },
-    { "name": "optIn", "type": "boolean" }
+    { "name": "optIn", "type": "boolean", "doc": "Indicates if the customer explicitly accepted (true) or rejected (false) the term." },
+    { "name": "expiresAt", "type": "string", "doc": "UTC timestamp (ISO-8601) when this consent authorization expires." },
+    {
+      "name": "signature",
+      "doc": "Audit metadata evidence captured when the customer action was recorded.",
+      "type": {
+        "type": "record",
+        "name": "ConsentSignature",
+        "fields": [
+          { "name": "ip", "type": "string", "doc": "Client IP address observed during the consent action." },
+          { "name": "userAgent", "type": "string", "doc": "Raw user-agent string sent by the client application/device." },
+          { "name": "deviceId", "type": "string", "doc": "Device identifier informed by the client for traceability." },
+          { "name": "channel", "type": "string", "doc": "Origin channel where consent happened, for example APP, WEB, or API." },
+          {
+            "name": "geolocation",
+            "doc": "Approximate geolocation metadata collected at consent time.",
+            "type": {
+              "type": "record",
+              "name": "ConsentGeolocation",
+              "fields": [
+                { "name": "lat", "type": "string", "doc": "Latitude in decimal degrees represented as string." },
+                { "name": "long", "type": "string", "doc": "Longitude in decimal degrees represented as string." }
+              ]
+            }
+          }
+        ]
+      }
+    }
   ]
 }

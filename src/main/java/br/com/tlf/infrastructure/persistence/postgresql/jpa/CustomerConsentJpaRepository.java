@@ -14,7 +14,7 @@ public interface CustomerConsentJpaRepository extends JpaRepository<CustomerCons
         SELECT c FROM CustomerConsentJpaEntity c
         WHERE c.cpf = :cpf
           AND c.termCode = :termCode
-          AND c.expiresAt > CURRENT_TIMESTAMP
+          AND (c.expiresAt IS NULL OR c.expiresAt > CURRENT_TIMESTAMP)
         ORDER BY c.acceptedAt DESC
         LIMIT 1
     """)

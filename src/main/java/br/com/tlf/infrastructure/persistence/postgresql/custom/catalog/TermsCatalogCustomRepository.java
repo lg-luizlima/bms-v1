@@ -1,6 +1,7 @@
 package br.com.tlf.infrastructure.persistence.postgresql.custom.catalog;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
@@ -25,9 +26,17 @@ public class TermsCatalogCustomRepository implements TermsCatalogRepository {
     private final TermsCatalogRepositoryMapper termsCatalogRepositoryMapper;
 
     @Override
-    public List<TermsCatalogVO> findLatestActiveByProduct(String product) {
+    public List<TermsCatalogVO> findByIds(List<UUID> termIds) {
 
-        List<TermsCatalogJpaEntity> result = termsCatalogJpaRepository.findLatestActiveByProduct(product);
+        List<TermsCatalogJpaEntity> result = termsCatalogJpaRepository.findAllById(termIds);
+
+        return termsCatalogRepositoryMapper.toVO(result);
+    }
+
+    @Override
+    public List<TermsCatalogVO> findVigentTerms(String product) {
+
+        List<TermsCatalogJpaEntity> result = termsCatalogJpaRepository.findVigentTerms(product);
 
         return termsCatalogRepositoryMapper.toVO(result);
     }

@@ -16,8 +16,8 @@ public class ConsentRequestDummies {
 
     // ─── constantes ──────────────────────────────────────────────────────────
 
-    /** Raw CPF value that JwtTokenUtils.cpfToken() returns (mocked). */
-    public static final String CPF_PLAIN = "12345678900";
+    /** Raw CPF value that JwtTokenUtils.cpfToken() returns (mocked) — must pass CustomerIdResolver's checksum validation. */
+    public static final String CPF_PLAIN = "52998224725";
 
     /** Authorization header value passed to the service. */
     public static final String BEARER_TOKEN = "Bearer fake.jwt.token";
@@ -26,33 +26,31 @@ public class ConsentRequestDummies {
 
     public static AcceptedTermDTO acceptedRevokedTermDTO() {
         return AcceptedTermDTO.builder()
-                .termCode(CreditTermDummies.REVOKED_TERM_CODE)
+                .termId(CreditTermDummies.REVOKED_TERM_ID.toString())
                 .optIn(Boolean.TRUE)
                 .build();
     }
 
     public static AcceptedTermVO acceptedRevokedTermVO() {
         return AcceptedTermVO.builder()
-                .termCode(CreditTermDummies.REVOKED_TERM_CODE)
+                .termId(CreditTermDummies.REVOKED_TERM_ID.toString())
                 .optIn(Boolean.TRUE)
                 .build();
     }
 
     // ─── ConsentRequestDTO fixtures ───────────────────────────────────────────
 
-    /** Happy-path request: mandatory term (REVOKED_TERM_CODE) is included. */
+    /** Happy-path request: the revoked/hard term (REVOKED_TERM_ID) is included. */
     public static ConsentRequestDTO requestWithMandatoryTerm() {
         return ConsentRequestDTO.builder()
-                .product(CreditTermDummies.PRODUCT)
                 .acceptedTerms(List.of(acceptedRevokedTermDTO()))
                 .signature(signatureDTO())
                 .build();
     }
 
-    /** Missing-mandatory-term request: acceptedTerms is deliberately empty. */
+    /** Request with an empty acceptedTerms list. */
     public static ConsentRequestDTO requestMissingMandatoryTerm() {
         return ConsentRequestDTO.builder()
-                .product(CreditTermDummies.PRODUCT)
                 .acceptedTerms(Collections.emptyList())
                 .signature(signatureDTO())
                 .build();
@@ -67,17 +65,15 @@ public class ConsentRequestDummies {
     public static ConsentRequestVO consentRequestVO() {
         return ConsentRequestVO.builder()
                 .customerId(CreditTermDummies.CUSTOMER_ID)
-                .product(CreditTermDummies.PRODUCT)
                 .acceptedTerms(List.of(acceptedRevokedTermVO()))
                 .signature(signatureVO())
                 .build();
     }
 
-    /** VO for the missing-mandatory-term scenario: empty acceptedTerms. */
+    /** VO with an empty acceptedTerms list. */
     public static ConsentRequestVO consentRequestVOMissingTerm() {
         return ConsentRequestVO.builder()
                 .customerId(CreditTermDummies.CUSTOMER_ID)
-                .product(CreditTermDummies.PRODUCT)
                 .acceptedTerms(Collections.emptyList())
                 .signature(signatureVO())
                 .build();

@@ -33,7 +33,7 @@ public class CreditCoreController {
     @GetMapping(UrlConstant.TERMS_URI)
     @ResponseStatus(HttpStatus.OK)
     public ResponseDTO getActiveConsents(@RequestHeader String authorization,
-            @RequestParam String product,
+            @RequestParam(required = false) String product,
             @RequestHeader("x-channel-id") String channelId,
             @RequestHeader("x-correlation-id") String correlationId,
             @RequestHeader("x-customer-id") String customerId) {

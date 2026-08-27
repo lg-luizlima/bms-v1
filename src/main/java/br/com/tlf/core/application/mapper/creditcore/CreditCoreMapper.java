@@ -13,14 +13,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import br.com.tlf.core.domain.vo.consent.AcceptedTermVO;
 import br.com.tlf.core.domain.vo.consent.ConsentRequestVO;
+import br.com.tlf.core.domain.vo.consent.SignatureVO;
 import br.com.tlf.core.domain.vo.terms.ActiveConsentResponseVO;
 import br.com.tlf.core.domain.vo.terms.ConsentEventPayloadVO;
+import br.com.tlf.core.domain.vo.terms.ConsentSignaturePayloadVO;
 import br.com.tlf.core.domain.vo.terms.CustomerConsentVO;
 import br.com.tlf.core.domain.vo.terms.PendingTermVO;
 import br.com.tlf.core.domain.vo.terms.TermsCatalogVO;
 import br.com.tlf.core.port.in.dto.request.ConsentRequestDTO;
 import br.com.tlf.core.port.in.dto.response.ActiveConsentResponseDTO;
-import br.com.tlf.shared.constants.ApplicationConstants;
 
 @Mapper(componentModel = "spring")
 public interface CreditCoreMapper {
@@ -29,7 +30,6 @@ public interface CreditCoreMapper {
     ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Mapping(target = "customerId", source = "customerId")
-    @Mapping(target = "product", source = "request.product")
     @Mapping(target = "acceptedTerms", source = "request.acceptedTerms")
     @Mapping(target = "signature", source = "request.signature")
     ConsentRequestVO toVO(ConsentRequestDTO request, String customerId);
@@ -43,7 +43,7 @@ public interface CreditCoreMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "customerId", source = "cpfToken")
-    @Mapping(target = "termCode", source = "acceptedTerm.termCode")
+    @Mapping(target = "termCode", source = "termCatalog.termCode")
     @Mapping(target = "termId", source = "termCatalog.id")
     @Mapping(target = "optIn", source = "acceptedTerm.optIn")
     @Mapping(target = "acceptedAt", expression = "java(java.time.Instant.now())")
@@ -51,17 +51,22 @@ public interface CreditCoreMapper {
     @Mapping(target = "auditDetails", expression = "java(serializeAuditDetails(consentRequestVO))")
     CustomerConsentVO toCustomerConsentVO(String cpfToken, ConsentRequestVO consentRequestVO, AcceptedTermVO acceptedTerm, TermsCatalogVO termCatalog);
 
+    ConsentSignaturePayloadVO toConsentSignaturePayloadVO(SignatureVO signature);
+
     @Mapping(target = "customerId", source = "cpf")
     @Mapping(target = "termCode", source = "consent.termCode")
+    @Mapping(target = "templateId", source = "termCatalog.templateId")
     @Mapping(target = "termId", source = "consent.termId")
     @Mapping(target = "optIn", source = "consent.optIn")
-    ConsentEventPayloadVO toConsentEventPayloadVO(String cpf, CustomerConsentVO consent);
+    @Mapping(target = "expiresAt", expression = "java(consent.getExpiresAt() == null ? null : consent.getExpiresAt().toString())")
+    @Mapping(target = "signature", source = "signature")
+    ConsentEventPayloadVO toConsentEventPayloadVO(String cpf, CustomerConsentVO consent, TermsCatalogVO termCatalog, SignatureVO signature);
 
     default Instant calculateExpiresAt(TermsCatalogVO termCatalog) {
-        long days = termCatalog.getValidityDays() != null
-                ? termCatalog.getValidityDays()
-                : ApplicationConstants.MAX_VALIDITY_DAYS;
-        return Instant.now().plus(days, ChronoUnit.DAYS);
+        if (termCatalog.getValidityDays() == null) {
+            return null;
+        }
+        return Instant.now().plus(termCatalog.getValidityDays(), ChronoUnit.DAYS);
     }
 
     default String serializeAuditDetails(ConsentRequestVO consentRequestVO) {

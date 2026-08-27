@@ -11,6 +11,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class AcceptedTermVO {
 
-    private String termCode;
+    private String termId;
     private Boolean optIn;
 }

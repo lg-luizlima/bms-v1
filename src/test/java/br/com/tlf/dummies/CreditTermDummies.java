@@ -20,6 +20,7 @@ public class CreditTermDummies {
     public static final UUID   REVOKED_TERM_ID   = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     public static final String REVOKED_TERM_CODE = "DATAPREV_AUTH";
     public static final String REVOKED_VERSION   = "2.0";
+    public static final String REVOKED_TEMPLATE_ID = "template-dataprev-auth-v2";
 
     public static final UUID   SOFT_TERM_ID      = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     public static final String SOFT_TERM_CODE    = "PRIVACY_POLICY";
@@ -35,7 +36,6 @@ public class CreditTermDummies {
     public static TermsCatalogVO revokedTerm() {
         return TermsCatalogVO.builder()
                 .id(REVOKED_TERM_ID)
-                .product(PRODUCT)
                 .termCode(REVOKED_TERM_CODE)
                 .title("Autorização de Consulta Vínculos DATAPREV")
                 .version(REVOKED_VERSION)
@@ -46,6 +46,8 @@ public class CreditTermDummies {
                 .contentSummary("Autorizo consulta à Dataprev")
                 .contentText("Autorizo a instituição financeira a consultar meus vínculos empregatícios e margem consignável junto à Dataprev e aos órgãos competentes pelo prazo de 30 dias...")
                 .startAt(Instant.now().minusSeconds(24 * 60 * 60))
+                .requiresPostProcessing(true)
+                .templateId(REVOKED_TEMPLATE_ID)
                 .build();
     }
 
@@ -58,7 +60,6 @@ public class CreditTermDummies {
     public static TermsCatalogVO softTerm() {
         return TermsCatalogVO.builder()
                 .id(SOFT_TERM_ID)
-                .product(PRODUCT)
                 .termCode(SOFT_TERM_CODE)
                 .title("Política de Privacidade Crédito")
                 .version(SOFT_VERSION)
@@ -69,6 +70,7 @@ public class CreditTermDummies {
                 .contentSummary("Política de privacidade")
                 .contentText("Seus dados serão tratados conforme a LGPD...")
                 .startAt(Instant.now().minusSeconds(24 * 60 * 60))
+                .requiresPostProcessing(false)
                 .build();
     }
 

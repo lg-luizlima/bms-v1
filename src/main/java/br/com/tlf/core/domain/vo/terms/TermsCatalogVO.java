@@ -15,7 +15,6 @@ import lombok.NoArgsConstructor;
 public class TermsCatalogVO {
 
     private UUID id;
-    private String product;
     private String termCode;
     private String title;
     private String version;
@@ -28,4 +27,6 @@ public class TermsCatalogVO {
     private String contentUrl;
     private Instant startAt;
     private Instant endAt;
+    private Boolean requiresPostProcessing;
+    private String templateId;
 }

@@ -1,10 +1,12 @@
 package br.com.tlf.core.application.service.creditcore;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -24,10 +26,10 @@ import br.com.tlf.core.application.mapper.creditcore.CreditCoreMapper;
 import br.com.tlf.core.application.mapper.outboxeventqueue.OutBoxEventQueueMapper;
 import br.com.tlf.core.application.service.customer.CustomerIdResolver;
 import br.com.tlf.core.domain.exception.InvalidTermException;
-import br.com.tlf.core.domain.exception.MandatoryTermNotAcceptedException;
 import br.com.tlf.core.domain.exception.ProductNotFoundException;
 import br.com.tlf.core.domain.vo.consent.AcceptedTermVO;
 import br.com.tlf.core.domain.vo.consent.ConsentRequestVO;
+import br.com.tlf.core.domain.vo.consent.SignatureVO;
 import br.com.tlf.core.domain.vo.terms.ActiveConsentResponseVO;
 import br.com.tlf.core.domain.vo.terms.ConsentEventPayloadVO;
 import br.com.tlf.core.domain.vo.terms.CustomerConsentVO;
@@ -87,19 +89,18 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
 
                 publishEventHubIfEnabled(requestDTO);
 
-                log.debug("createConsent - customerId: {}, product: {}, acceptedTerms: {}, channelId: {}, correlationId: {}, customerIdHeader: {}",
-                        customerId, requestDTO.getProduct(), requestDTO.getAcceptedTerms(), channelId, correlationId, customerIdHeader);
+                log.debug("createConsent - customerId: {}, acceptedTerms: {}, channelId: {}, correlationId: {}, customerIdHeader: {}",
+                        customerId, requestDTO.getAcceptedTerms(), channelId, correlationId, customerIdHeader);
 
                 ConsentRequestVO consentRequestVO = creditCoreMapper.toVO(requestDTO, customerId);
 
-                List<TermsCatalogVO> latestActiveByProduct = termsCatalogRepository
-                                .findLatestActiveByProduct(requestDTO.getProduct());
+                Map<UUID, TermsCatalogVO> termsById = resolveAndValidateTerms(consentRequestVO.getAcceptedTerms());
 
-                validateMandatoryTerms(latestActiveByProduct, consentRequestVO.getAcceptedTerms(), customerId);
+                boolean anyPostProcessing = processAcceptedTerms(customerId, consentRequestVO, termsById);
 
-                processAcceptedTerms(customerId, consentRequestVO, latestActiveByProduct);
-
-                writeSyncStatus(consentRequestVO.getCustomerId());
+                if (anyPostProcessing) {
+                        writeSyncStatus(consentRequestVO.getCustomerId());
+                }
 
                 ConsentResponseDTO response = ConsentResponseDTO.builder()
                                 .consentReceivedAt(Instant.now())
@@ -108,6 +109,46 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                 consentIdempotencyChecker.cacheResponse(customerId, correlationId, response.getConsentReceivedAt());
 
                 return response;
+        }
+
+        private Map<UUID, TermsCatalogVO> resolveAndValidateTerms(List<AcceptedTermVO> acceptedTerms) {
+                List<String> invalidTermIds = new ArrayList<>();
+                List<UUID> parsedIds = new ArrayList<>();
+                Map<UUID, String> uuidToRaw = new HashMap<>();
+
+                for (AcceptedTermVO acceptedTerm : acceptedTerms) {
+                        try {
+                                UUID termId = UUID.fromString(acceptedTerm.getTermId());
+                                parsedIds.add(termId);
+                                uuidToRaw.put(termId, acceptedTerm.getTermId());
+                        } catch (IllegalArgumentException ex) {
+                                invalidTermIds.add(acceptedTerm.getTermId());
+                        }
+                }
+
+                Map<UUID, TermsCatalogVO> foundTerms = termsCatalogRepository.findByIds(parsedIds).stream()
+                                .collect(Collectors.toMap(TermsCatalogVO::getId, t -> t));
+
+                Instant now = Instant.now();
+                for (UUID termId : parsedIds) {
+                        TermsCatalogVO term = foundTerms.get(termId);
+                        if (term == null || !isVigent(term, now)) {
+                                invalidTermIds.add(uuidToRaw.get(termId));
+                        }
+                }
+
+                if (!invalidTermIds.isEmpty()) {
+                        log.error("[createConsent] Invalid, not found or out-of-validity term id(s): {}", invalidTermIds);
+                        throw new InvalidTermException("Invalid term id", invalidTermIds);
+                }
+
+                return foundTerms;
+        }
+
+        private boolean isVigent(TermsCatalogVO term, Instant now) {
+                boolean afterStart = now.isAfter(term.getStartAt());
+                boolean beforeEnd = term.getEndAt() == null || now.isBefore(term.getEndAt());
+                return afterStart && beforeEnd;
         }
 
         private void writeSyncStatus(String customerId) {
@@ -157,28 +198,25 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                                                 }));
         }
 
-        private void processAcceptedTerms(String customerId, ConsentRequestVO consentRequestVO,
-                        List<TermsCatalogVO> latestActiveByProduct) {
-                Map<String, TermsCatalogVO> catalogMap = latestVersionPerTermCode(latestActiveByProduct);
+        private boolean processAcceptedTerms(String customerId, ConsentRequestVO consentRequestVO,
+                        Map<UUID, TermsCatalogVO> termsById) {
+                boolean anyPostProcessing = false;
 
                 for (AcceptedTermVO acceptedTerm : consentRequestVO.getAcceptedTerms()) {
-                        TermsCatalogVO catalogTerm = catalogMap.get(acceptedTerm.getTermCode());
-
-                        if (catalogTerm == null) {
-                                log.error("[createConsent] Invalid term code not found in catalog: {}", acceptedTerm.getTermCode());
-                                throw new InvalidTermException(
-                                                "Invalid term code",
-                                                List.of(acceptedTerm.getTermCode()));
-                        }
+                        TermsCatalogVO catalogTerm = termsById.get(UUID.fromString(acceptedTerm.getTermId()));
 
                         if (!isTermSigned(catalogTerm, customerId)) {
-                                log.info("[createConsent] Saving consent for customerId: {}, termCode: {}, termId: {}", customerId, acceptedTerm.getTermCode(), catalogTerm.getId());
+                                log.info("[createConsent] Saving consent for customerId: {}, termCode: {}, termId: {}", customerId, catalogTerm.getTermCode(), catalogTerm.getId());
                                 CustomerConsentVO consent = creditCoreMapper.toCustomerConsentVO(customerId, consentRequestVO, acceptedTerm, catalogTerm);
-                                saveConsentAtomically(consent, customerId);
-                        }else{
-                                log.info("[createConsent] Term already signed for customerId: {}, termCode: {}, termId: {}", customerId, acceptedTerm.getTermCode(), catalogTerm.getId());
+                                if (saveConsentAtomically(consent, customerId, catalogTerm, consentRequestVO.getSignature())) {
+                                        anyPostProcessing = true;
+                                }
+                        } else {
+                                log.info("[createConsent] Term already signed for customerId: {}, termCode: {}, termId: {}", customerId, catalogTerm.getTermCode(), catalogTerm.getId());
                         }
                 }
+
+                return anyPostProcessing;
         }
 
         @Override
@@ -190,10 +228,11 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                 log.info("getPendingTerms - customerId: {}, product: {}, channelId: {}, correlationId: {}, customerIdHeader: {}",
                                 customerIdHeader, product, channelId, correlationId, customerIdHeader);
 
-                List<TermsCatalogVO> rawTermsCatalog = termsCatalogRepository.findLatestActiveByProduct(product);
+                List<TermsCatalogVO> rawTermsCatalog = termsCatalogRepository.findVigentTerms(product);
 
-                if (rawTermsCatalog.isEmpty())
+                if (rawTermsCatalog.isEmpty() && product != null) {
                         throw new ProductNotFoundException("Product not found.", List.of("No product was found for " + product));
+                }
 
                 List<TermsCatalogVO> termsCatalog = List.copyOf(latestVersionPerTermCode(rawTermsCatalog).values());
 
@@ -211,7 +250,7 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                 log.warn("[getPendingTerms] Pending terms for customerId hash {} and product {}: {}", customerId, product, pendingTerms.size());
 
                 ActiveConsentResponseVO build = ActiveConsentResponseVO.builder()
-                                .product(termsCatalog.getFirst().getProduct())
+                                .product(product)
                                 .hasPendingMandatoryTerms(hasPendingMandatoryTerms)
                                 .pendingTerms(creditCoreMapper.toPendingTermVO(pendingTerms))
                                 .build();
@@ -219,15 +258,23 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                 return creditCoreMapper.toActiveConsentResponseDTO(build);
         }
 
-        private void saveConsentAtomically(CustomerConsentVO consent, String customerId) {
+        private boolean saveConsentAtomically(CustomerConsentVO consent, String customerId, TermsCatalogVO termCatalog,
+                        SignatureVO signature) {
+                boolean requiresPostProcessing = Boolean.TRUE.equals(termCatalog.getRequiresPostProcessing());
+
                 transactionTemplate.executeWithoutResult(status -> {
                         customerConsentRepository.saveConsent(consent);
 
-                        ConsentEventPayloadVO eventPayload = creditCoreMapper.toConsentEventPayloadVO(customerId, consent);
-                        outboxEventQueueRepository.save(
-                                        outBoxEventQueueMapper.toVO(consent.getCustomerId(), jsonSerializer.toJson(eventPayload),
-                                                        currentTraceParent()));
+                        if (requiresPostProcessing) {
+                                ConsentEventPayloadVO eventPayload = creditCoreMapper.toConsentEventPayloadVO(customerId, consent,
+                                                termCatalog, signature);
+                                outboxEventQueueRepository.save(
+                                                outBoxEventQueueMapper.toVO(consent.getCustomerId(), jsonSerializer.toJson(eventPayload),
+                                                                currentTraceParent()));
+                        }
                 });
+
+                return requiresPostProcessing;
         }
 
         private String currentTraceParent() {
@@ -253,29 +300,6 @@ public class CreditCoreServiceImpl implements CreditCorePortIn {
                 }
 
                 return true;
-        }
-
-        private void validateMandatoryTerms(List<TermsCatalogVO> catalogTerms, List<AcceptedTermVO> acceptedTerms, String customerId) {
-
-                Map<String, Boolean> acceptedTermsMap = acceptedTerms.stream()
-                                .collect(Collectors.toMap(AcceptedTermVO::getTermCode, AcceptedTermVO::getOptIn));
-
-                List<String> missingMandatoryTerms = catalogTerms.stream()
-                                .filter(term -> Boolean.TRUE.equals(term.getIsMandatory()))
-                                .filter(term -> !isTermSigned(term, customerId))
-                                .filter(term -> {
-                                        Boolean optIn = acceptedTermsMap.get(term.getTermCode());
-                                        return optIn == null || Boolean.FALSE.equals(optIn);
-                                })
-                                .map(TermsCatalogVO::getTermCode)
-                                .toList();
-
-                if (!missingMandatoryTerms.isEmpty()) {
-                        log.warn("[createConsent] Missing mandatory terms: {}", missingMandatoryTerms);
-                        throw new MandatoryTermNotAcceptedException(
-                                        "Mandatory terms not accepted",
-                                        missingMandatoryTerms);
-                }
         }
 
 }
