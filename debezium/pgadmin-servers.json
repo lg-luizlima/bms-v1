@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "ms-vivopay-credit-consent (local)",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "ms_vivopay",
+      "Username": "postgres",
+      "SSLMode": "prefer"
+    }
+  }
+}

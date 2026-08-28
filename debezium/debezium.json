@@ -12,7 +12,7 @@
     "database.port": "5432",
     "database.user": "postgres",
     "database.password": "postgres",
-    "database.dbname": "ms_vivopay",
+    "database.dbname": "credit_consent",
     "topic.prefix": "credit-consent-cdc",
     "slot.name": "credit_consent_outbox_slot",
     "publication.name": "credit_consent_publication",

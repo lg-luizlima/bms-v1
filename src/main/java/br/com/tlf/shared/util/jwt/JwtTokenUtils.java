@@ -1,114 +1,45 @@
 package br.com.tlf.shared.util.jwt;
 
+import java.util.Objects;
 
 import com.auth0.jwt.JWT;
+import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
-import br.com.tlf.shared.util.HmacUtils;
-import br.com.tlf.shared.util.jwt.exception.InvalidTokenException;
-import br.com.tlf.shared.util.jwt.exception.TokenNullException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.Keys;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-
-import java.security.Key;
-import java.util.*;
+import br.com.tlf.core.domain.exception.InvalidTokenException;
+import br.com.tlf.core.domain.exception.TokenNullException;
 
 
-@Component
-public class JwtTokenUtils {
+public final class JwtTokenUtils {
 
-    private static final Logger log = LoggerFactory.getLogger(JwtTokenUtils.class);
+    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String CPF_CLAIM = "cpf";
+
+    private JwtTokenUtils() {
+    }
 
     public static String cpfToken(String token) {
-        log.info("Decoding JWT token to extract CPF");
-        String cpf;
-        try {
-            cpf = decodeJwt(token);
-            log.info("Decoded CPF: {}", cpf);
-        } catch (JsonProcessingException e) {
-            throw new InvalidTokenException("Error trying to decode token");
-        }
-        return cpf;
-    }
-
-    public String generateToken(String customerId) {
-
-        String encryptedCustomerId = null;
-
-        try {
-            encryptedCustomerId = HmacUtils.generateHmacSha256(customerId.getBytes());
-        } catch (Exception ex) {
-            throw new InvalidTokenException("Error trying to create token");
-        }
-
-        if (encryptedCustomerId != null) {
-            Key signingKey = getSigningKey(encryptedCustomerId);
-
-            LinkedHashMap<String, Object> claims = new LinkedHashMap<>();
-            claims.put("term-id", customerId);
-
-            String token = Jwts.builder().setClaims(claims)
-                    .setSubject(customerId)
-                    .setIssuedAt(new Date(System.currentTimeMillis()))
-                    .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 24))
-                    .signWith(signingKey, SignatureAlgorithm.HS256)
-                    .setId(UUID.randomUUID().toString())
-                    .setHeaderParam("kid","VivoCustomerDomain")
-                    .compact();
-
-            return token;
-        }
-
-        return null;
-    }
-
-
-    private static String decodeJwt(String token) throws JsonProcessingException {
-
         if (Objects.isNull(token)) {
             throw new TokenNullException("Authorization is mandatory");
         }
 
-        DecodedJWT jwt;
         try {
-
-            if (token.startsWith("Bearer")) {
-                token = token.substring(7);
-            }
-
-            jwt = JWT.decode(token);
-
-            var claims = jwt.getClaims();
-            var claimsMap = new HashMap<>();
-
-            claims.forEach((key, value) -> claimsMap.put(key, value.as(Object.class)));
-
-            var mapper = new ObjectMapper();
-            var jsonString = mapper.writeValueAsString(claimsMap);
-
-            var rootNode = mapper.readTree(jsonString);
-
-
-            var  idNode = rootNode.path("cpf");
-
-
-            return idNode.asText();
-
-        } catch (Exception e) {
+            DecodedJWT jwt = JWT.decode(stripBearerPrefix(token));
+            return cpfClaimValue(jwt.getClaim(CPF_CLAIM));
+        } catch (RuntimeException e) {
             throw new InvalidTokenException("Invalid JWT format");
         }
-
     }
 
-    private Key getSigningKey(String encodedString) {
-        byte[] keyBytes = Decoders.BASE64.decode(encodedString);
-        return Keys.hmacShaKeyFor(keyBytes);
+    private static String stripBearerPrefix(String token) {
+        return token.startsWith(BEARER_PREFIX) ? token.substring(BEARER_PREFIX.length()) : token;
+    }
+
+    private static String cpfClaimValue(Claim claim) {
+        if (claim.isMissing() || claim.isNull()) {
+            return null;
+        }
+        String asString = claim.asString();
+        return asString != null ? asString : String.valueOf(claim.as(Object.class));
     }
 }

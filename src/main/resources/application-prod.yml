@@ -108,7 +108,7 @@ redis:
 
 observability:
   pii:
-    redis-values-enabled: ${OBSERVABILITY_PII_REDIS_VALUES:true}
+    redis-values-enabled: ${OBSERVABILITY_PII_REDIS_VALUES:false}
   noise-reduction:
     health-endpoints-enabled: ${OTEL_HEALTH_ENDPOINTS_ENABLED:true}
 

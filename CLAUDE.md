@@ -57,9 +57,9 @@ When this flag is `false`, app still writes outbox and Debezium remains the prim
 
 ### Trace propagation through Debezium/CDC
 
-`CreditCoreServiceImpl.currentTraceParent()` captures the current span's W3C `traceparent`
+`OutboxConsentEventAdapter.currentTraceParent()` captures the current span's W3C `traceparent`
 (via injected `Tracer`/`Propagator`) into `tb_outbox_events.trace_context` in the same
-transaction as the outbox write. Debezium's outbox `EventRouter` promotes that column to a
+transaction as the outbox write — in the adapter, so the core stays free of Micrometer. Debezium's outbox `EventRouter` promotes that column to a
 Kafka header (`debezium/debezium.json`'s `transforms.outbox.table.fields.additional.placement`,
 `trace_context:header:traceparent`). The worker's `KafkaConsumerConfig`/`KafkaProducerConfig`
 have `ContainerProperties`/`KafkaTemplate.setObservationEnabled(true)` +
@@ -86,11 +86,14 @@ to put the real OTel trace id (not a random UUID) into every `ProblemDetailRespo
 - **Redis**: Lettuce Observation is automatic in Boot 4.1
   (`LettuceObservationAutoConfiguration`, classpath-triggered once an `ObservationRegistry`
   bean exists — no property enables it) but only ever emits command name + peer address, never
-  key/value. `CreditCoreServiceImpl.writeSyncStatus(...)` wraps the single Redis write in a
-  manual `Observation` (`redis.sync_status.write`, parent of Boot's automatic `SET` command
-  span) that attaches `redis.key`/`redis.value` as span attributes only when
+  key/value. `RedisConsentCacheAdapter` — the only class that talks to Redis — wraps each command
+  in a manual `Observation` (`redis.sync_status.write`, `redis.idempotency.read`,
+  `redis.idempotency.write`; each the parent of Boot's automatic `GET`/`SET` span) that attaches
+  `redis.key`/`redis.value` as span attributes only when
   `observability.pii.redis-values-enabled=true` (`ObservabilityPiiProperties` — `true` in
-  local/dev, `false` in hml/prod).
+  local/dev, `false` in hml/prod). **The Java default is `false`; keep the hml/prod YAML defaults
+  `false` too.** They read `true` for a while, which exported the CPF-bearing Redis key as a span
+  attribute in production.
 
 ### Local observability stack
 
@@ -111,19 +114,58 @@ the Prometheus *scrape* of `/actuator/prometheus` is the only working metrics pa
 ./mvnw test -Dtest=ClassName#methodName # single method
 ```
 
-Tests use Mockito (`@ExtendWith(MockitoExtension.class)`) — no Spring context loaded, no H2. Test fixtures live in `src/test/java/br/com/tlf/dummies/`:
-- `ConsentRequestDummies` — request/response DTOs and VOs; constants `CPF_PLAIN`, `BEARER_TOKEN`
-- `CreditTermDummies` — `TermsCatalogVO` fixtures (revokedTerm, softTerm)
-- `CustomerConsentDummies` — `CustomerConsentVO` fixtures
+Most tests are plain Mockito (`@ExtendWith(MockitoExtension.class)`) with no Spring context and no
+database. Two exceptions:
+- `CreditCoreControllerTest` — `@WebMvcTest` slice. Boot 4 moved the annotation to
+  `org.springframework.boot.webmvc.test.autoconfigure` (artifact `spring-boot-starter-webmvc-test`).
+  The slice picks up lib-fintech-log's `MyFilter`, so the test supplies its two collaborators
+  (`ObservationRegistry`, `SensitiveProperties` — the latter needs a **mutable** field set, its
+  `init()` mutates it). There is no `com.fasterxml...ObjectMapper` bean: Boot 4 wires **Jackson 3**
+  (`tools.jackson`) for HTTP while `JsonSerializer` uses Jackson 2 — both read the same
+  `com.fasterxml.jackson.annotation` annotations, so `@JsonProperty` behaves identically either way.
+- `HexagonalArchitectureTest` — ArchUnit; see "The core is framework-free" above.
+
+Time is injected: `TimeConfig` exposes a `Clock` bean and the use cases take it, so tests assert on a
+fixed instant instead of `Instant.now()`.
+
+Test fixtures live in `src/test/java/br/com/tlf/dummies/`:
+- `ConsentRequestDummies` — request DTOs, domain records and `CreateConsentCommand`; constants `CPF_PLAIN`, `BEARER_TOKEN`
+- `CreditTermDummies` — `TermsCatalogEntry` fixtures (revokedTerm = hard update, softTerm = soft update)
+- `CustomerConsentDummies` — `CustomerConsent` fixtures
 
 ## Architecture
 
 Hexagonal (Ports & Adapters), Java 21, blocking JPA/Hibernate + Spring MVC (Tomcat) on the request path. Four top-level packages under `br.com.tlf`:
 
-- **api** — REST layer: controllers, request/response DTOs, exception handlers
-- **core** — Domain: port interfaces (`port/in`, `port/out`), application services, domain VOs, exceptions
-- **infrastructure** — Outbound adapters: PostgreSQL JPA, Azure Event Hub, outbox pattern
-- **shared** — Cross-cutting: utilities (`HmacUtils`, `JwtTokenUtils`, `MathUtils`), config beans (`observability/OpenTelemetryLoggingConfig`, `observability/ObservabilityPiiProperties`)
+- **api** — REST layer: controllers, request/response DTOs (`api/rest/creditcore/dto/`), DTO↔domain mapper, header→identity resolver, exception handlers
+- **core** — Domain records + rules (`core/domain/`), use cases (`core/application/usecase/`), ports (`core/port/in`, `core/port/out`)
+- **infrastructure** — Outbound adapters: PostgreSQL JPA, Redis cache, Azure Event Hub, transactional outbox, transaction runner
+- **shared** — Cross-cutting: `JsonSerializer`, `JwtTokenUtils`, `Clock` bean (`configuration/TimeConfig`), observability config
+
+### The core is framework-free, and a test enforces it
+
+`src/test/java/br/com/tlf/architecture/HexagonalArchitectureTest.java` (ArchUnit) fails the build if
+`br.com.tlf.core..` gains a dependency on Jackson, Swagger, Jakarta Validation, Spring Data, Spring
+transactions, Spring Web, JPA, Azure or Micrometer — and if `core.domain..` touches Spring at all.
+**Read that test before adding a dependency to the core**: everything the core needs from the outside
+goes through a `port/out` interface (`ConsentCachePort`, `TransactionRunner`, `ConsentEventOutbox`,
+`EventHubPort`), and the adapter on the other side owns the framework.
+
+That is why: the HTTP DTOs live in `api` and not in `port/in`; the inbound ports take
+`CreateConsentCommand`/`PendingTermsQuery` records rather than raw HTTP headers; `StringRedisTemplate`
+lives only in `RedisConsentCacheAdapter`; `TransactionTemplate` only in `SpringTransactionRunner`;
+and `Tracer`/`Propagator` only in `OutboxConsentEventAdapter`.
+
+### VO / DTO conventions
+
+- **Domain types are immutable `record`s** under `core/domain/<aggregate>/` (`consent`, `terms`,
+  `customer`), with the business rules as methods on them — `TermsCatalogEntry.isVigentAt(...)`,
+  `.isNewerThan(...)`, `.expiryFrom(...)`, `TermsCatalog.latestVersionPerTermCode()`,
+  `CustomerConsent.covers(term)`, `Cpf.isValid(...)`. There is no `vo` package and no `VO` suffix.
+- **`DTO` suffix means HTTP contract** and only ever appears under `api/rest/`.
+- **Wire formats for outbound integrations are separate records in `infrastructure`**, not domain
+  types: `infrastructure/persistence/postgresql/outbox/contract/` (the outbox payload the worker
+  consumes) and `infrastructure/eventhub/contract/`.
 
 This repo has **no outbound HTTP client and no WebFlux dependency** — the only outbound integrations are Postgres (JPA), Redis (Lettuce), and Azure Event Hub. (The middleware repo, `ms-vivo-fintech-middleware-lending-core-credit-v1`, is the one with a `WebClientConfiguration`/`RestClient` outbound setup — don't confuse the two.)
 
@@ -149,7 +191,9 @@ adapters.
 
 ### Request flow
 
-`CreditCoreController` → `CreditCorePortIn` → `CreditCoreServiceImpl` → out-port interfaces → infrastructure adapters
+`CreditCoreController` → `CustomerIdResolver` + `CreditCoreApiMapper` (DTO → command) →
+`CreateConsentPort`/`GetPendingTermsPort` → `CreateConsentUseCase`/`GetPendingTermsUseCase` →
+out-port interfaces → infrastructure adapters → mapper (domain → DTO) → `ResponseDTO<T>` envelope
 
 ### REST Endpoints
 
@@ -164,27 +208,58 @@ Base path: `/credit-core/v1`
 
 | Interface | Location | Adapter |
 |-----------|----------|---------|
-| `CreditCorePortIn` | `core/port/in/creditcore/` | `CreditCoreServiceImpl` |
+| `CreateConsentPort` | `core/port/in/` | `CreateConsentUseCase` |
+| `GetPendingTermsPort` | `core/port/in/` | `GetPendingTermsUseCase` |
 | `CustomerConsentRepository` | `core/port/out/customerconsent/` | `CustomerConsentCustomRepository` (JPA) |
 | `TermsCatalogRepository` | `core/port/out/termscatalog/` | `TermsCatalogCustomRepository` (JPA) |
-| `OutboxEventQueueRepository` | `core/port/out/outbox/` | `OutboxEventQueueCustomRepository` (JPA) |
+| `ConsentEventOutbox` | `core/port/out/outbox/` | `OutboxConsentEventAdapter` (JPA) |
+| `ConsentCachePort` | `core/port/out/cache/` | `RedisConsentCacheAdapter` (Lettuce) |
+| `TransactionRunner` | `core/port/out/transaction/` | `SpringTransactionRunner` (`TransactionTemplate`) |
 | `EventHubPort` | `core/port/out/eventhub/` | `EventHubAdapter` (`EventHubProducerClient`) |
 
 **CustomerConsentRepository methods:**
-- `CustomerConsentVO getActiveCustomerConsent(String cpf, String termCode)`
-- `CustomerConsentVO saveConsent(CustomerConsentVO consent)`
+- `Map<String, CustomerConsent> findActiveConsentsByTermCode(String customerId, Collection<String> termCodes)` —
+  **batched on purpose**: both use cases need the active consent for every term they inspect, and the
+  previous per-term lookup issued one query per term.
+- `CustomerConsent save(CustomerConsent consent)`
 
 **TermsCatalogRepository methods:**
-- `List<TermsCatalogVO> findLatestActiveByProduct(String product)`
+- `List<TermsCatalogEntry> findByIds(List<UUID> termIds)`
+- `TermsCatalog findVigentTerms(String product)`
 
-The consent + outbox write is wrapped in a single transaction via `TransactionTemplate` (`CreditCoreServiceImpl.saveConsentAtomically`), not `@Transactional` on a private method — self-invoked private methods are never intercepted by Spring's proxy-based AOP, so that annotation would silently be a no-op regardless of blocking vs. reactive.
+**One transaction per request, not per term.** `CreateConsentUseCase.registerConsents` collects every
+not-yet-signed term first, then persists all of them (consent rows + outbox rows) inside a single
+`TransactionRunner.runInTransaction(...)`. Doing it per term meant a failure on the second term left
+the first one committed with its event already queued. `TransactionTemplate` rather than
+`@Transactional` because the unit of work is a lambda handed over from the core — and a self-invoked
+annotated private method is never intercepted by Spring's proxy-based AOP anyway.
+
+**Event Hub publishes only after the terms validate.** The parallel publish used to run before
+`resolveAndValidateTerms`, so a request that ended in a 422 had already emitted its event.
 
 ### Domain model
 
-The service manages versioned **terms catalogs** per product (e.g. `EP_INSS`) and records customer **consents** (accepted terms + audit signature). cpf are not hashed anywhere (repository lookups, Redis keys) lib-fintech-logs leads with de security problem . Consent events are published to Azure Event Hub using the **outbox pattern** (`tb_outbox_events` table, consumed by Debezium CDC). Redis (`StringRedisTemplate`) caches processing status during consent creation with key `sync_status:{cpf}` (TTL configurável via `SYNC_STATUS_TTL_REDIS`, default 86400s) e a resposta idempotente do POST `/consents` com key `post_consent_idempotency:{cpf}:{correlationId}` (TTL via `CONSENT_IDEMPOTENCY_CHECK_TTL_REDIS`, default 60s). Ambos os TTLs são lidos de `redis.ttl.*` nos `application-*.yml` — nunca reusar `ApplicationConstants.MAX_VALIDITY_DAYS`, que é regra de negócio (validade de termos), como TTL de cache.
+The service manages versioned **terms catalogs** per product (e.g. `EP_INSS`) and records customer
+**consents** (accepted terms + audit signature).
+
+**CPF is stored, cached and published in the clear — deliberately, and it must stay that way.** It is
+the `tb_customer_consents.cpf` column, the customer id inside both Redis keys, the
+`tb_outbox_events.aggregate_id` (which the Debezium outbox router turns into the **Kafka message
+key**) and a field of the published payload. Hashing, HMAC-ing or tokenizing any of these is a
+breaking change for downstream consumers and partitioning — do not introduce one without an explicit
+migration decision.
+
+Consent events are published to Azure Event Hub using the **outbox pattern** (`tb_outbox_events`,
+consumed by Debezium CDC). Redis caches processing status during consent creation with key
+`sync_status:{cpf}` (TTL via `SYNC_STATUS_TTL_REDIS`, default 86400s) and the idempotent
+`POST /consents` response with key `post_consent_idempotency:{cpf}:{correlationId}` (TTL via
+`CONSENT_IDEMPOTENCY_CHECK_TTL_REDIS`, default 60s). Both key formats live in
+`infrastructure/cache/redis/RedisKeys` and are read by other services — keep them byte-identical.
+Both TTLs come from `redis.ttl.*` via `RedisTtlProperties`; never reuse a business rule (a term's
+validity period) as a cache TTL.
 
 **JPA entities** (`infrastructure/persistence/postgresql/entity/`):
-- `CustomerConsentJpaEntity` — cpf (64-char), termCode, termId (FK, plain UUID column, no relation), optIn, acceptedAt, expiresAt, auditDetails (`@JdbcTypeCode(SqlTypes.JSON)` → Postgres `jsonb`, mapped as `String`)
+- `CustomerConsentJpaEntity` — cpf (64-char), termCode, termId (FK, plain UUID column, no relation), optIn, acceptedAt, expiresAt, auditDetails (`@JdbcTypeCode(SqlTypes.JSON)` → Postgres `jsonb`, mapped as `String`). The domain's `CustomerConsent` holds a `Signature` record instead; `CustomerConsentRepositoryMapper` serializes it to/from that column via `JsonSerializer`, so JSON encoding never reaches the core.
 - `TermsCatalogJpaEntity` — product, termCode, version, isMandatory, validityDays, revokePreviousVersions, contentType, contentSummary, contentText, contentUrl, startAt, endAt
 - `OutboxEventQueueJpaEntity` — aggregateType, aggregateId, topicName, payload (jsonb), createdAt (`@CreationTimestamp`)
 
@@ -200,25 +275,61 @@ Schema lives in the database's default `public` schema — no dedicated schema, 
 
 `BusinessException` is the base domain exception. Subclasses map to HTTP status via `ApiExceptionHandler` (RestControllerAdvice). All error responses follow `ProblemDetailResponse` format (errorCode, message, details, timestamp, traceId, errors list).
 
-| Exception | HTTP Status |
-|-----------|-------------|
-| `MissingAuditDataException` | 400 |
-| `InvalidTermException` | 422 |
-| `MandatoryTermNotAcceptedException` | 422 |
-| Unhandled `Exception` | 500 |
+`ApiExceptionHandler` has **one** `@ExceptionHandler(BusinessException.class)` plus the
+`MethodArgumentNotValid` override and a catch-all. Status comes from a
+`Map<DomainErrorCode, HttpStatus>` in that class — a new domain error is one enum constant plus one
+map entry, never another handler method.
+
+| `DomainErrorCode` | Code | HTTP Status |
+|-------------------|------|-------------|
+| `BAD_REQUEST` | 4000 | 400 |
+| `INVALID_CPF_PARAMETER` | 4002 | 400 |
+| `MISSING_CUSTOMER_IDENTIFICATION` | 4003 | 400 |
+| `INVALID_TOKEN` | 4004 | 400 |
+| `PRODUCT_NOT_FOUND` | 4040 | 404 |
+| `INVALID_TERM` | 4221 | 422 |
+| `MANDATORY_TERM_NOT_ACCEPTED` | 4222 | 422 |
+| `UNEXPECTED_ERROR` | 5000 | 500 |
+
+The numeric codes are part of the public contract — **append, never renumber**.
+
+**Request-body validation is live.** `@Valid` on the `@RequestBody` was missing, which made every
+`@NotEmpty`/`@NotNull`/`@NotBlank` on the DTOs inert and meant `{"acceptedTerms": [], "signature": null}`
+returned 201 having saved nothing. It now returns 400, and the `@NotBlank` constraints on
+`signature.ip`/`deviceId` are what enforce the "audit signature requires device data" rule (the
+`MissingAuditDataException` that used to represent it was never actually thrown, and is gone).
+
+**Never put the MDC stack trace outside a `try`-with-resources.** `MDC.putCloseable` is used so the
+entry is scoped to the handler; Tomcat reuses request threads, and a plain `MDC.put` leaked the stack
+trace into the next request served by that thread.
 
 ### Mappers
 
-Domain VOs ↔ JPA entities are converted via custom repository classes + MapStruct mappers (`@Mapping`-annotated interfaces, `componentModel = "spring"`) — never manual `.builder()...build()` construction in service/repository code. Lombok + MapStruct annotation processors are both configured — keep the `lombok-mapstruct-binding` dependency when adding new mappers.
+**Project standard: every object construction that is pure reshaping — copying fields from one or
+more existing objects/params into a new one, no business decision, no side effect — is a
+`@Mapper(componentModel = "spring")` method, never a `.builder()...build()` written inline in a
+service, use case or repository.** Lombok + MapStruct annotation processors are both configured —
+keep the `lombok-mapstruct-binding` dependency when adding new mappers.
 
-Key mappers:
-- `CreditCoreMapper` (`core/application/mapper/creditcore/`) — ConsentRequestDTO ↔ VO, TermsCatalogVO → PendingTermVO, composes CustomerConsentVO
-- `CustomerConsentRepositoryMapper` (`infrastructure/persistence/postgresql/mapper/`) — CustomerConsentVO ↔ CustomerConsentJpaEntity
-- `TermsCatalogRepositoryMapper` (`infrastructure/persistence/postgresql/mapper/`) — `List<TermsCatalogJpaEntity>` → `List<TermsCatalogVO>`
-- `OutBoxEventQueueMapper` (`core/application/mapper/outboxeventqueue/`) — `(consentId, payloadJson)` → `OutBoxEventQueueVO`, used by `CreditCoreServiceImpl` so the service never touches a JPA entity type directly
-- `OutboxEventQueueRepositoryMapper` (`infrastructure/persistence/postgresql/mapper/`) — `OutBoxEventQueueVO` → `OutboxEventQueueJpaEntity`, used only inside `OutboxEventQueueCustomRepository`
+The rule applies at every layer, not just the repository boundary: `CreateConsentUseCase` used to
+build `CustomerConsent` and `ConsentRegisteredEvent` via inline `.builder()` calls; both are now one
+`ConsentMapper` call each. The boundary that keeps this rule from swallowing all business logic: a
+builder call that also makes a decision or reads a side effect is not mapping and stays inline —
+`GetPendingTermsUseCase`'s `PendingTermsResult.builder()` computes `hasPendingMandatoryTerms` via
+`.anyMatch(...)` (a decision), and `OutboxConsentEventAdapter`'s `OutboxEventQueueJpaEntity.builder()`
+reads `currentTraceParent()` (a side effect) alongside constants — neither is a mapper candidate.
 
-The outbox mapping is deliberately split in two (VO-facing vs. entity-facing) so the service layer stays independent of the JPA entity types, matching the boundary the other two repositories already keep.
+Every mapper sits **on a boundary**, and each boundary has exactly one:
+- `CreditCoreApiMapper` (`api/rest/creditcore/mapper/`) — DTO ↔ domain, including `(ConsentRequestDTO, customerId, correlationId, channelId) → CreateConsentCommand`
+- `TermsCatalogMapper` (`core/application/mapper/`) — `TermsCatalogEntry` → `PendingTerm`
+- `ConsentMapper` (`core/application/mapper/`) — `(CreateConsentCommand, TermsCatalogEntry, AcceptedTerm, Instant) → CustomerConsent` and `(CustomerConsent, TermsCatalogEntry, Signature) → ConsentRegisteredEvent`; `expiresAt` keeps calling the domain's `TermsCatalogEntry.expiryFrom(...)` via a MapStruct `expression`, so the expiry rule itself still lives in the domain and the mapper only invokes it
+- `CustomerConsentRepositoryMapper` (`infrastructure/.../mapper/`) — `CustomerConsent` ↔ `CustomerConsentJpaEntity`; an abstract class so it can `@Autowired` `JsonSerializer` for the `audit_details` jsonb column — that's the standard MapStruct pattern for a mapper with an injected collaborator, not an exception to the rule above
+- `TermsCatalogRepositoryMapper` (`infrastructure/.../mapper/`) — `TermsCatalogJpaEntity` → `TermsCatalogEntry`
+- `ConsentRegisteredPayloadMapper` (`infrastructure/.../outbox/`) — `ConsentRegisteredEvent` → outbox wire payload
+- `ConsentRequestedEventMapper` (`infrastructure/eventhub/contract/`) — domain → Event Hub wire payload
+
+There is no `Mappers.getMapper()` `INSTANCE` field anywhere: `componentModel = "spring"` is the single
+instantiation strategy. Likewise `JsonSerializer` is the only JSON codec — do not `new ObjectMapper()`.
 
 ## Profiles & Environment
 
@@ -238,6 +349,8 @@ Default profile is `local`. Production profiles (`dev`, `hml`, `prod`) require:
 | `REDIS_SSL` | Liga TLS no Lettuce (`spring.data.redis.ssl.enabled`) — default `true`. Azure Cache for Redis **exige** TLS na porta 6380 |
 | `REDIS_TIMEOUT` | Timeout de comando Redis em ms — default `10000` |
 | `REDIS_CONNECT_TIMEOUT` | Timeout de conexão/handshake Redis em ms — default `5000` |
+| `OBSERVABILITY_PII_REDIS_VALUES` | Anexa `redis.key`/`redis.value` (que contêm o CPF) como atributos de span — default `true` em local/dev, **`false` em hml/prod** |
+| `EVENTHUB_PARALLEL_PUBLISH_ENABLED` | Publicação síncrona em paralelo ao outbox — default `true` (`features.eventhub.parallel-publish-enabled`, lido por `EventHubPublishProperties`) |
 
 Os TTLs de Redis são declarados nos `secrets` de cada ambiente
 (`.azuredevops/config/{dev,hml,prod}/secrets.{yaml,yml}`) via marcadores `$(SYNC_STATUS_TTL_REDIS_DEV)` /
@@ -252,8 +365,8 @@ Connection initialization timed out after 1 minute(s)` em HML (cliente falando t
 
 ### Redis é best-effort no `POST /consents`
 
-Redis aqui é apenas cache (idempotência de curta janela e `sync_status`), nunca fonte de verdade. Tanto
-`ConsentIdempotencyChecker` (leitura e escrita) quanto `CreditCoreServiceImpl.writeSyncStatus` capturam
+Redis aqui é apenas cache (idempotência de curta janela e `sync_status`), nunca fonte de verdade.
+`RedisConsentCacheAdapter` (única classe que fala com o Redis) captura
 `org.springframework.dao.DataAccessException` (superclasse de `RedisConnectionFailureException`,
 `RedisSystemException` e `QueryTimeoutException`), logam em `WARN` e seguem o fluxo: leitura vira cache miss,
 escrita é descartada. As `Observation` continuam marcando o span como erro antes do catch. Trade-off aceito:
@@ -265,7 +378,8 @@ preferível à indisponibilidade total do endpoint, e sinalizado no log de WARN.
 - **Spring Boot** (lib-starter-parent:4.1.2), **Spring MVC** (Tomcat) + **Spring Data JPA**, **Flyway** (schema), Spring Data Redis (blocking, Lettuce client)
 - **Azure Event Hubs** — outbound event publishing (`EventHubProducerClient`, blocking)
 - **MapStruct 1.5.3** + **Lombok** — VO/entity mapping
-- **java-jwt 4.4.0** + **jjwt 0.11.5** — JWT parsing in `JwtTokenUtils`
+- **java-jwt 4.4.0** — JWT parsing in `JwtTokenUtils`. It only **decodes**: the signature is not
+  verified here, so authenticity depends on the API gateway upstream.
 - **SpringDoc OpenAPI 3** — Swagger UI
 - **Netflix Eureka Client** — service discovery
 - **Observability** (`spring-boot-starter-opentelemetry`) — Micrometer Tracing (OTel bridge) + OTLP trace/metrics export, fully managed by the Boot BOM (no explicit version pin needed, unlike `resilience4j`-style dependencies — confirmed against the `spring-boot-dependencies:4.1.0` POM). See README's "Observabilidade — OpenTelemetry" section (worker repo) for the full end-to-end design; this repo's role is capturing the current span's W3C traceparent into `tb_outbox_events.trace_context` so Debezium can promote it to a Kafka header. See "Observability" section below for SQL/Redis span instrumentation.

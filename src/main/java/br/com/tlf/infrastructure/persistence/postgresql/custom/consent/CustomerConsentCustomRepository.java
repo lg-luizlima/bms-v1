@@ -1,10 +1,14 @@
 package br.com.tlf.infrastructure.persistence.postgresql.custom.consent;
 
-import org.springframework.context.annotation.Primary;
-import org.springframework.stereotype.Repository;
-import org.springframework.validation.annotation.Validated;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
-import br.com.tlf.core.domain.vo.terms.CustomerConsentVO;
+import org.springframework.stereotype.Repository;
+
+import br.com.tlf.core.domain.consent.CustomerConsent;
 import br.com.tlf.core.port.out.customerconsent.CustomerConsentRepository;
 import br.com.tlf.infrastructure.persistence.postgresql.entity.CustomerConsentJpaEntity;
 import br.com.tlf.infrastructure.persistence.postgresql.jpa.CustomerConsentJpaRepository;
@@ -13,33 +17,34 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
+@Repository
 @RequiredArgsConstructor
-@Repository("CustomerConsentCustomRepository")
-@Validated
-@Primary
 public class CustomerConsentCustomRepository implements CustomerConsentRepository {
 
     private final CustomerConsentJpaRepository customerConsentJpaRepository;
     private final CustomerConsentRepositoryMapper customerConsentRepositoryMapper;
 
     @Override
-    public CustomerConsentVO getActiveCustomerConsent(String cpf, String termCode) {
-        log.info("Getting active consent termId for cpf={}, termCode={}", cpf, termCode);
+    public Map<String, CustomerConsent> findActiveConsentsByTermCode(String customerId,
+            Collection<String> termCodes) {
 
-        return customerConsentJpaRepository
-                .findActiveByCpfAndTermCode(cpf, termCode)
-                .map(customerConsentRepositoryMapper::toVO)
-                .orElse(null);
+        if (termCodes.isEmpty()) {
+            return Map.of();
+        }
+
+        return customerConsentJpaRepository.findActiveByCpfAndTermCodes(customerId, termCodes).stream()
+                .map(customerConsentRepositoryMapper::toDomain)
+                .collect(Collectors.toMap(CustomerConsent::termCode, Function.identity(),
+                        (newest, older) -> newest, LinkedHashMap::new));
     }
 
     @Override
-    public CustomerConsentVO saveConsent(CustomerConsentVO consentVO) {
-        log.info("Persisting consent for consentVO: {}", consentVO);
+    public CustomerConsent save(CustomerConsent consent) {
+        log.info("Persisting consent for termCode: {}, termId: {}", consent.termCode(), consent.termId());
 
-        CustomerConsentJpaEntity entity = customerConsentRepositoryMapper.toEntity(consentVO);
+        CustomerConsentJpaEntity saved =
+                customerConsentJpaRepository.save(customerConsentRepositoryMapper.toEntity(consent));
 
-        customerConsentJpaRepository.save(entity);
-        CustomerConsentVO savedConsent = customerConsentRepositoryMapper.toVO(entity);
-        return savedConsent;
+        return customerConsentRepositoryMapper.toDomain(saved);
     }
 }

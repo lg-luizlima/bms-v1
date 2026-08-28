@@ -29,7 +29,7 @@
               "name": "ConsentGeolocation",
               "fields": [
                 { "name": "lat", "type": "string", "doc": "Latitude in decimal degrees represented as string." },
-                { "name": "long", "type": "string", "doc": "Longitude in decimal degrees represented as string." }
+                { "name": "lon", "type": "string", "doc": "Longitude in decimal degrees represented as string." }
               ]
             }
           }
