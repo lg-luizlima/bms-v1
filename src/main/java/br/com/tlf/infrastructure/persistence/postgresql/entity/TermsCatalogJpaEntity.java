@@ -1,19 +1,21 @@
 package br.com.tlf.infrastructure.persistence.postgresql.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.UUID;
 
+
 @Entity
-@Table(name = "tb_terms")
+@Table(
+    name = "tb_terms",
+    indexes = {
+        @Index(name = "idx_terms_term_code", columnList = "term_code"),
+        @Index(name = "idx_terms_start_end", columnList = "start_at,end_at")
+    }
+)
 @Getter
 @NoArgsConstructor
 public class TermsCatalogJpaEntity {
