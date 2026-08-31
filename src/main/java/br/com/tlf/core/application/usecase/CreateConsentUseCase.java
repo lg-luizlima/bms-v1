@@ -11,6 +11,9 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import br.com.tlf.core.domain.exception.MandatoryTermNotAcceptedException;
+import br.com.tlf.core.domain.exception.TermNotFoundException;
+import br.com.tlf.core.domain.exception.TermOutOfValidityException;
 import org.springframework.stereotype.Service;
 
 import br.com.tlf.core.application.mapper.ConsentMapper;
@@ -62,39 +65,86 @@ public class CreateConsentUseCase implements CreateConsentPort {
         }
 
         ConsentReceipt receipt = new ConsentReceipt(Instant.now(clock));
-        consentCache.cacheIdempotentResponse(command.customerId(), command.correlationId(),
+
+        consentCache.writeCacheIdempotentResponse(command.customerId(), command.correlationId(),
                 receipt.consentReceivedAt());
 
         return receipt;
     }
 
     private Map<UUID, TermsCatalogEntry> resolveAndValidateTerms(List<AcceptedTerm> acceptedTerms) {
-        List<String> invalidTermIds = new ArrayList<>();
-        Map<UUID, String> rawIdByUuid = new LinkedHashMap<>();
+
+        List<String> invalidIds = new ArrayList<>();
+        List<String> notFoundIds = new ArrayList<>();
+        List<String> expiredIds = new ArrayList<>();
+        List<String> mandatoryRejectedIds = new ArrayList<>();
+
+        Map<UUID, AcceptedTerm> acceptedById = new LinkedHashMap<>();
 
         for (AcceptedTerm acceptedTerm : acceptedTerms) {
             try {
-                rawIdByUuid.put(UUID.fromString(acceptedTerm.termId()), acceptedTerm.termId());
+                acceptedById.put(
+                    UUID.fromString(acceptedTerm.termId()),
+                    acceptedTerm
+                );
             } catch (IllegalArgumentException ex) {
-                invalidTermIds.add(acceptedTerm.termId());
+                invalidIds.add(acceptedTerm.termId());
             }
         }
 
         Map<UUID, TermsCatalogEntry> foundTerms =
-                termsCatalogRepository.findByIds(List.copyOf(rawIdByUuid.keySet())).stream()
-                        .collect(Collectors.toMap(TermsCatalogEntry::id, Function.identity()));
+            termsCatalogRepository.findByIds(List.copyOf(acceptedById.keySet()))
+                .stream()
+                .collect(Collectors.toMap(
+                    TermsCatalogEntry::id,
+                    Function.identity()
+                ));
 
         Instant now = Instant.now(clock);
-        rawIdByUuid.forEach((termId, rawId) -> {
+
+        acceptedById.forEach((termId, acceptedTerm) -> {
+
             TermsCatalogEntry term = foundTerms.get(termId);
-            if (term == null || !term.isVigentAt(now)) {
-                invalidTermIds.add(rawId);
+
+            if (term == null) {
+                notFoundIds.add(acceptedTerm.termId());
+                return;
+            }
+
+            if (!term.isVigentAt(now)) {
+                expiredIds.add(acceptedTerm.termId());
+                return;
+            }
+
+            if (term.isMandatoryTerm()
+                && !Boolean.TRUE.equals(acceptedTerm.optIn())) {
+
+                mandatoryRejectedIds.add(acceptedTerm.termId());
             }
         });
 
-        if (!invalidTermIds.isEmpty()) {
-            log.error("[createConsent] Invalid, not found or out-of-validity term id(s): {}", invalidTermIds);
-            throw new InvalidTermException("Invalid term id", invalidTermIds);
+        if (!invalidIds.isEmpty()) {
+            throw new InvalidTermException(
+                "Invalid term id format",
+                invalidIds);
+        }
+
+        if (!notFoundIds.isEmpty()) {
+            throw new TermNotFoundException(
+                "Term not found",
+                notFoundIds);
+        }
+
+        if (!expiredIds.isEmpty()) {
+            throw new TermOutOfValidityException(
+                "Term out of validity period",
+                expiredIds);
+        }
+
+        if (!mandatoryRejectedIds.isEmpty()) {
+            throw new MandatoryTermNotAcceptedException(
+                "Mandatory terms must be accepted",
+                mandatoryRejectedIds);
         }
 
         return foundTerms;

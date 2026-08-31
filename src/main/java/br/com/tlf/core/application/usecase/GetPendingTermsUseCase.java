@@ -40,7 +40,7 @@ public class GetPendingTermsUseCase implements GetPendingTermsPort {
         TermsCatalog currentTerms = vigentTerms.latestVersionPerTermCode();
         List<TermsCatalogEntry> pendingEntries = pendingEntries(query.customerId(), currentTerms);
 
-        log.debug("[getPendingTerms] product={} correlationId={} pendingTerms={}",
+        log.info("[getPendingTerms] product={} correlationId={} pendingTerms={}",
                 query.product(), query.correlationId(), pendingEntries.size());
 
         List<PendingTerm> pendingTerms = termsCatalogMapper.toPendingTerms(pendingEntries);

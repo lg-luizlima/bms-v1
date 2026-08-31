@@ -8,7 +8,7 @@ public interface ConsentCachePort {
 
     Optional<Instant> findIdempotentResponse(String customerId, String correlationId);
 
-    void cacheIdempotentResponse(String customerId, String correlationId, Instant consentReceivedAt);
+    void writeCacheIdempotentResponse(String customerId, String correlationId, Instant consentReceivedAt);
 
     void writeSyncStatus(String customerId);
 }

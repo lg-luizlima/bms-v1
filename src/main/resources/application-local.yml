@@ -15,6 +15,8 @@ management:
     sampling:
       probability: ${OTEL_TRACES_SAMPLER_PROBABILITY:1.0}
   logging:
+    level:
+    org.springframework.web: DEBUG
     export:
       otlp:
         enabled: ${OTEL_EXPORTER_OTLP_ENABLED:true}

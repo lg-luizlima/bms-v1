@@ -67,20 +67,20 @@ class RedisConsentCacheAdapterTest {
     }
 
     @Test
-    void cacheIdempotentResponse_writesWithConfiguredTtl() {
+    void writeCacheIdempotentResponse_writesWithConfiguredTtl() {
         Instant receivedAt = Instant.parse("2026-08-28T12:00:00Z");
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-        underTest.cacheIdempotentResponse(CUSTOMER_ID, CORRELATION_ID, receivedAt);
+        underTest.writeCacheIdempotentResponse(CUSTOMER_ID, CORRELATION_ID, receivedAt);
 
         verify(valueOperations).set(IDEMPOTENCY_KEY, receivedAt.toString(), Duration.ofSeconds(60));
     }
 
     @Test
-    void cacheIdempotentResponse_redisDown_isSwallowed() {
+    void writeCacheIdempotentResponse_redisDown_isSwallowed() {
         when(redisTemplate.opsForValue()).thenThrow(new RedisConnectionFailureException("down"));
 
-        underTest.cacheIdempotentResponse(CUSTOMER_ID, CORRELATION_ID, Instant.now());
+        underTest.writeCacheIdempotentResponse(CUSTOMER_ID, CORRELATION_ID, Instant.now());
     }
 
     @Test

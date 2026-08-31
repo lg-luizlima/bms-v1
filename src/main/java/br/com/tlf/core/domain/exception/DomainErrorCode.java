@@ -14,6 +14,8 @@ public enum DomainErrorCode {
     PRODUCT_NOT_FOUND(4040),
     INVALID_TERM(4221),
     MANDATORY_TERM_NOT_ACCEPTED(4222),
+    TERM_NOT_FOUND(4223),
+    TERM_OUT_OF_VALIDITY(4224),
     UNEXPECTED_ERROR(5000);
 
     private final int code;

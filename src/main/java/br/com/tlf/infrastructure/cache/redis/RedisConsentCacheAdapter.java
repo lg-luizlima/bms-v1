@@ -41,7 +41,7 @@ public class RedisConsentCacheAdapter implements ConsentCachePort {
     }
 
     @Override
-    public void cacheIdempotentResponse(String customerId, String correlationId, Instant consentReceivedAt) {
+    public void writeCacheIdempotentResponse(String customerId, String correlationId, Instant consentReceivedAt) {
         String key = RedisKeys.postConsentIdempotency(customerId, correlationId);
         String value = consentReceivedAt.toString();
 
@@ -50,7 +50,7 @@ public class RedisConsentCacheAdapter implements ConsentCachePort {
                     redisTemplate.opsForValue().set(key, value, ttl.consentIdempotencyCheck());
                     return null;
                 },
-                ex -> log.warn("[cacheIdempotentResponse] Redis unavailable, idempotency response not cached "
+                ex -> log.warn("[writeCacheIdempotentResponse] Redis unavailable, idempotency response not cached "
                         + "for correlationId: {}: {}", correlationId, ex.getMessage()));
     }
 

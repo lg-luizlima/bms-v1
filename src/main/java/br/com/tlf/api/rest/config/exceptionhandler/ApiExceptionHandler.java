@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -27,6 +28,10 @@ import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.exc.InvalidFormatException;
+import tools.jackson.databind.exc.MismatchedInputException;
+import tools.jackson.databind.exc.UnrecognizedPropertyException;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -108,6 +113,24 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         }
     }
 
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+
+        try (MDC.MDCCloseable ignored = putStackTraceInMdc(ex)) {
+            log.error("[ApiExceptionHandler] request body could not be read: {}", ex.getMessage());
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ProblemDetailResponse.builder()
+                    .errorCode(DomainErrorCode.BAD_REQUEST.getCode())
+                    .message(BAD_REQUEST_TITLE)
+                    .details("Invalid field type in request body.")
+                    .timestamp(Instant.now(clock).toString())
+                    .traceId(currentTraceId())
+                    .errors(toInvalidFormatErrors   (ex))
+                    .build());
+        }
+    }
+
     // Keep this handler as the last one, to catch any unexpected exceptions that may occur in the application
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetailResponse> handleUnexpectedException(Exception ex) {
@@ -142,5 +165,49 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return messages.stream()
                 .map(message -> ErrorDetail.builder().message(message).build())
                 .toList();
+    }
+
+    private List<ErrorDetail> toInvalidFormatErrors(HttpMessageNotReadableException ex) {
+        if (ex.getCause() instanceof MismatchedInputException cause) {
+            return List.of(ErrorDetail.builder()
+                    .field(fieldPath(cause.getPath()))
+                    .message(formatMessage(cause))
+                    .build());
+        }
+        return List.of();
+    }
+
+    private String fieldPath(List<JacksonException.Reference> path) {
+        StringBuilder builder = new StringBuilder();
+        for (JacksonException.Reference reference : path) {
+            if (reference.getIndex() >= 0) {
+                builder.append('[').append(reference.getIndex()).append(']');
+            } else if (reference.getPropertyName() != null) {
+                if (!builder.isEmpty()) {
+                    builder.append('.');
+                }
+                builder.append(reference.getPropertyName());
+            }
+        }
+        return builder.toString();
+    }
+
+    private String formatMessage(MismatchedInputException cause) {
+        if (cause instanceof UnrecognizedPropertyException unrecognized) {
+            return "Unrecognized field \"" + unrecognized.getPropertyName() + "\".";
+        }
+
+        Class<?> targetType = cause.getTargetType();
+        if (cause instanceof InvalidFormatException invalidFormat) {
+            if (UUID.class.equals(targetType)) {
+                return "Expected UUID format.";
+            }
+            String expectedType = targetType != null ? targetType.getSimpleName() : "value";
+            Object value = invalidFormat.getValue();
+            String receivedType = value != null ? value.getClass().getSimpleName() : "null";
+            return "Expected %s but received %s.".formatted(expectedType, receivedType);
+        }
+
+        return "Malformed value in request body.";
     }
 }

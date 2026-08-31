@@ -21,6 +21,8 @@ public final class CreditTermDummies {
     public static final String SOFT_TERM_CODE = "PRIVACY_POLICY";
     public static final String SOFT_VERSION = "1.0";
 
+    private static final Instant TERM_STARTED_AT = Instant.parse("2020-01-01T00:00:00Z");
+
     private CreditTermDummies() {
     }
 
@@ -37,7 +39,7 @@ public final class CreditTermDummies {
                 .contentType("TEXTO")
                 .contentSummary("Autorizo consulta à Dataprev")
                 .contentText("Autorizo a instituição financeira a consultar meus vínculos empregatícios...")
-                .startAt(Instant.now().minusSeconds(24 * 60 * 60))
+                .startAt(TERM_STARTED_AT)
                 .requiresPostProcessing(true)
                 .templateId(REVOKED_TEMPLATE_ID)
                 .build();
@@ -56,7 +58,7 @@ public final class CreditTermDummies {
                 .contentType("TEXTO")
                 .contentSummary("Política de privacidade")
                 .contentText("Seus dados serão tratados conforme a LGPD...")
-                .startAt(Instant.now().minusSeconds(24 * 60 * 60))
+                .startAt(TERM_STARTED_AT)
                 .requiresPostProcessing(false)
                 .build();
     }

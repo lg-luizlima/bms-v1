@@ -97,6 +97,16 @@ class CreditCoreControllerTest {
                 .content(JSON.toJson(body));
     }
 
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder consentPostRaw(String rawJson) {
+        return post(CONSENTS_URL)
+                .header("authorization", ConsentRequestDummies.BEARER_TOKEN)
+                .header("x-channel-id", ConsentRequestDummies.CHANNEL_ID)
+                .header("x-correlation-id", ConsentRequestDummies.CORRELATION_ID)
+                .header("x-customer-id", ConsentRequestDummies.CPF_PLAIN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(rawJson);
+    }
+
     @Test
     void createConsent_validBody_returns201WithEnvelope() throws Exception {
         when(createConsentPort.execute(any())).thenReturn(new ConsentReceipt(NOW));
@@ -144,6 +154,56 @@ class CreditCoreControllerTest {
                         .content(JSON.toJson(ConsentRequestDummies.requestWithMandatoryTerm())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(4002));
+    }
+
+    @Test
+    void createConsent_optInWrongType_returns400WithFieldError() throws Exception {
+        String rawBody = """
+                {
+                  "acceptedTerms": [
+                    {"termId": "%s", "optIn": "oi"}
+                  ],
+                  "signature": {
+                    "ip": "192.168.0.1",
+                    "userAgent": "Mozilla/5.0",
+                    "deviceId": "device-abc-001",
+                    "channel": "MOBILE"
+                  }
+                }
+                """.formatted(java.util.UUID.randomUUID());
+
+        mockMvc.perform(consentPostRaw(rawBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(4000))
+                .andExpect(jsonPath("$.errors[0].field").value("acceptedTerms[0].optIn"))
+                .andExpect(jsonPath("$.errors[0].message").value("Expected Boolean but received String."));
+
+        verify(createConsentPort, never()).execute(any());
+    }
+
+    @Test
+    void createConsent_termIdInvalidUuid_returns400WithFieldError() throws Exception {
+        String rawBody = """
+                {
+                  "acceptedTerms": [
+                    {"termId": "abc", "optIn": true}
+                  ],
+                  "signature": {
+                    "ip": "192.168.0.1",
+                    "userAgent": "Mozilla/5.0",
+                    "deviceId": "device-abc-001",
+                    "channel": "MOBILE"
+                  }
+                }
+                """;
+
+        mockMvc.perform(consentPostRaw(rawBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(4000))
+                .andExpect(jsonPath("$.errors[0].field").value("acceptedTerms[0].termId"))
+                .andExpect(jsonPath("$.errors[0].message").value("Expected UUID format."));
+
+        verify(createConsentPort, never()).execute(any());
     }
 
     @Test

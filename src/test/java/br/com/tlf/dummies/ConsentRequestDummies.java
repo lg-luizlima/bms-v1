@@ -28,7 +28,7 @@ public final class ConsentRequestDummies {
 
     public static AcceptedTermDTO acceptedRevokedTermDTO() {
         return AcceptedTermDTO.builder()
-                .termId(CreditTermDummies.REVOKED_TERM_ID.toString())
+                .termId(CreditTermDummies.REVOKED_TERM_ID)
                 .optIn(Boolean.TRUE)
                 .build();
     }

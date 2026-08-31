@@ -32,7 +32,6 @@ public class SignatureDTO implements Serializable {
     @NotBlank
     private String channel;
 
-    @NotNull
     @Valid
     private GeolocationDTO geolocation;
 }

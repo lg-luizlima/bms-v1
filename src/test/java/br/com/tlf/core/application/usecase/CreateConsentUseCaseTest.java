@@ -29,6 +29,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import br.com.tlf.core.domain.consent.AcceptedTerm;
+import br.com.tlf.core.domain.exception.TermOutOfValidityException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +44,7 @@ import br.com.tlf.core.domain.consent.ConsentReceipt;
 import br.com.tlf.core.domain.consent.ConsentRegisteredEvent;
 import br.com.tlf.core.domain.consent.CustomerConsent;
 import br.com.tlf.core.domain.exception.InvalidTermException;
+import br.com.tlf.core.domain.exception.MandatoryTermNotAcceptedException;
 import br.com.tlf.core.domain.terms.TermsCatalogEntry;
 import br.com.tlf.core.port.out.cache.ConsentCachePort;
 import br.com.tlf.core.port.out.customerconsent.CustomerConsentRepository;
@@ -112,7 +115,7 @@ class CreateConsentUseCaseTest {
         assertThat(eventCaptor.getValue().termCode()).isEqualTo(REVOKED_TERM_CODE);
 
         verify(consentCache).writeSyncStatus(CUSTOMER_ID);
-        verify(consentCache).cacheIdempotentResponse(CUSTOMER_ID, CORRELATION_ID, NOW);
+        verify(consentCache).writeCacheIdempotentResponse(CUSTOMER_ID, CORRELATION_ID, NOW);
     }
 
     @Test
@@ -185,15 +188,73 @@ class CreateConsentUseCaseTest {
     }
 
     @Test
-    void unknownTermId_throwsInvalidTermExceptionAndPublishesNothing() {
-        when(termsCatalogRepository.findByIds(anyList())).thenReturn(List.of());
-        when(consentCache.findIdempotentResponse(CUSTOMER_ID, CORRELATION_ID)).thenReturn(Optional.empty());
+    void mandatoryTermWithOptOut_throwsMandatoryTermNotAcceptedException() {
 
-        assertThrows(InvalidTermException.class,
-                () -> underTest.execute(ConsentRequestDummies.commandWithMandatoryTerm()));
+        when(termsCatalogRepository.findByIds(anyList()))
+            .thenReturn(List.of(CreditTermDummies.revokedTerm()));
 
-        verifyNoInteractions(eventHubPort, consentEventOutbox);
+        when(consentCache.findIdempotentResponse(CUSTOMER_ID, CORRELATION_ID))
+            .thenReturn(Optional.empty());
+
+        MandatoryTermNotAcceptedException thrown = assertThrows(
+            MandatoryTermNotAcceptedException.class,
+            () -> underTest.execute(
+                ConsentRequestDummies.commandWith(
+                    new AcceptedTerm(REVOKED_TERM_ID.toString(), Boolean.FALSE)
+                ))
+        );
+
+        assertThat(thrown.getErrors())
+            .containsExactly(REVOKED_TERM_ID.toString());
+
         verify(customerConsentRepository, never()).save(any());
+        verifyNoInteractions(consentEventOutbox);
+    }
+
+    @Test
+    void mandatoryTermWithNullOptIn_throwsMandatoryTermNotAcceptedException() {
+
+        when(termsCatalogRepository.findByIds(anyList()))
+            .thenReturn(List.of(CreditTermDummies.revokedTerm()));
+
+        when(consentCache.findIdempotentResponse(CUSTOMER_ID, CORRELATION_ID))
+            .thenReturn(Optional.empty());
+
+        MandatoryTermNotAcceptedException thrown = assertThrows(
+            MandatoryTermNotAcceptedException.class,
+            () -> underTest.execute(
+                ConsentRequestDummies.commandWith(
+                    new AcceptedTerm(REVOKED_TERM_ID.toString(), null)
+                ))
+        );
+
+        assertThat(thrown.getErrors())
+            .containsExactly(REVOKED_TERM_ID.toString());
+
+        verify(customerConsentRepository, never()).save(any());
+    }
+
+    @Test
+    void optionalTermWithOptOut_isAccepted() {
+
+        when(termsCatalogRepository.findByIds(anyList()))
+            .thenReturn(List.of(CreditTermDummies.softTerm()));
+
+        when(customerConsentRepository.findActiveConsentsByTermCode(
+            eq(CUSTOMER_ID), anyCollection()))
+            .thenReturn(Map.of());
+
+        when(consentCache.findIdempotentResponse(CUSTOMER_ID, CORRELATION_ID))
+            .thenReturn(Optional.empty());
+
+        runTransactionsInline();
+
+        underTest.execute(
+            ConsentRequestDummies.commandWith(
+                new AcceptedTerm(SOFT_TERM_ID.toString(), Boolean.FALSE)
+            ));
+
+        verify(customerConsentRepository).save(any());
     }
 
     @Test
@@ -208,7 +269,7 @@ class CreateConsentUseCaseTest {
     }
 
     @Test
-    void termOutsideValidityWindow_throwsInvalidTermException() {
+    void termOutsideValidityWindow_throwsTermOutOfValidityException() {
         TermsCatalogEntry expired = CreditTermDummies.revokedTerm().toBuilder()
                 .startAt(NOW.minus(10, ChronoUnit.DAYS))
                 .endAt(NOW.minus(1, ChronoUnit.DAYS))
@@ -216,7 +277,7 @@ class CreateConsentUseCaseTest {
         when(termsCatalogRepository.findByIds(anyList())).thenReturn(List.of(expired));
         when(consentCache.findIdempotentResponse(CUSTOMER_ID, CORRELATION_ID)).thenReturn(Optional.empty());
 
-        assertThrows(InvalidTermException.class,
+        assertThrows(TermOutOfValidityException.class,
                 () -> underTest.execute(ConsentRequestDummies.commandWithMandatoryTerm()));
     }
 
