@@ -39,7 +39,7 @@ import br.com.tlf.logging.SensitiveProperties;
 import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.Tracer;
 
-@WebMvcTest(CreditCoreController.class)
+@WebMvcTest(CreditCoreControllerOpen.class)
 @Import({CreditCoreApiMapperImpl.class, CustomerIdResolver.class,
         CreditCoreControllerTest.ObservabilityTestConfig.class})
 class CreditCoreControllerTest {
@@ -114,7 +114,7 @@ class CreditCoreControllerTest {
         mockMvc.perform(consentPost(ConsentRequestDummies.requestWithMandatoryTerm()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("success"))
-                .andExpect(jsonPath("$.message").value("Consent options registered successfully."))
+                .andExpect(jsonPath("$.message").value(CreditCoreControllerOpenApi.CREATE_CONSENT_SUCCESS_MESSAGE))
                 .andExpect(jsonPath("$.data.consentReceivedAt").exists());
     }
 

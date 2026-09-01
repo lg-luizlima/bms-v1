@@ -2,9 +2,7 @@ package br.com.tlf.api.rest.config.exceptionhandler;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -20,6 +18,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import br.com.tlf.api.rest.config.exceptionhandler.DomainErrorRegistry.DomainErrorMetadata;
 import br.com.tlf.api.rest.config.exceptionhandler.model.ErrorDetail;
 import br.com.tlf.api.rest.config.exceptionhandler.model.ProblemDetailResponse;
 import br.com.tlf.core.domain.exception.BusinessException;
@@ -40,31 +39,10 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final String MDC_EXCEPTION_KEY = "exception";
     private static final int MDC_STACK_TRACE_LIMIT = 500;
-    private static final String BUSINESS_ERROR_TITLE = "Business Validation Error";
-    private static final String BAD_REQUEST_TITLE = "Bad Request Error";
 
-
-    private static final Map<DomainErrorCode, HttpStatus> STATUS_BY_ERROR_CODE =
-            new EnumMap<>(Map.of(
-                    DomainErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST,
-                    DomainErrorCode.INVALID_CPF_PARAMETER, HttpStatus.BAD_REQUEST,
-                    DomainErrorCode.MISSING_CUSTOMER_IDENTIFICATION, HttpStatus.BAD_REQUEST,
-                    DomainErrorCode.INVALID_TOKEN, HttpStatus.BAD_REQUEST,
-                    DomainErrorCode.PRODUCT_NOT_FOUND, HttpStatus.NOT_FOUND,
-                    DomainErrorCode.INVALID_TERM, HttpStatus.UNPROCESSABLE_ENTITY,
-                    DomainErrorCode.MANDATORY_TERM_NOT_ACCEPTED, HttpStatus.UNPROCESSABLE_ENTITY,
-                    DomainErrorCode.UNEXPECTED_ERROR, HttpStatus.INTERNAL_SERVER_ERROR));
-
-    private static final Map<DomainErrorCode, String> TITLE_BY_ERROR_CODE =
-            new EnumMap<>(Map.of(
-                    DomainErrorCode.BAD_REQUEST, BAD_REQUEST_TITLE,
-                    DomainErrorCode.INVALID_CPF_PARAMETER, BAD_REQUEST_TITLE,
-                    DomainErrorCode.MISSING_CUSTOMER_IDENTIFICATION, BAD_REQUEST_TITLE,
-                    DomainErrorCode.INVALID_TOKEN, BAD_REQUEST_TITLE,
-                    DomainErrorCode.PRODUCT_NOT_FOUND, BUSINESS_ERROR_TITLE,
-                    DomainErrorCode.INVALID_TERM, BUSINESS_ERROR_TITLE,
-                    DomainErrorCode.MANDATORY_TERM_NOT_ACCEPTED, BUSINESS_ERROR_TITLE,
-                    DomainErrorCode.UNEXPECTED_ERROR, "Internal Server Error"));
+    /** Shared with {@code BadRequestValidationExample} so its Swagger example can't drift from this text. */
+    public static final String MISSING_REQUIRED_FIELD_DETAILS =
+            "Required field is missing or null inside the request body.";
 
     private final Tracer tracer;
     private final Clock clock;
@@ -72,14 +50,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ProblemDetailResponse> handleBusinessException(BusinessException ex) {
         DomainErrorCode errorCode = ex.getErrorCode();
-        HttpStatus status = STATUS_BY_ERROR_CODE.getOrDefault(errorCode, HttpStatus.UNPROCESSABLE_ENTITY);
+        DomainErrorMetadata metadata = DomainErrorRegistry.metadataFor(errorCode);
 
         try (MDC.MDCCloseable ignored = putStackTraceInMdc(ex)) {
             log.error("[ApiExceptionHandler] {}: {}", errorCode, ex.getMessage());
 
-            return ResponseEntity.status(status).body(ProblemDetailResponse.builder()
+            return ResponseEntity.status(metadata.status()).body(ProblemDetailResponse.builder()
                     .errorCode(errorCode.getCode())
-                    .message(TITLE_BY_ERROR_CODE.getOrDefault(errorCode, BUSINESS_ERROR_TITLE))
+                    .message(metadata.title())
                     .details(ex.getMessage())
                     .timestamp(Instant.now(clock).toString())
                     .traceId(currentTraceId())
@@ -104,8 +82,8 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ProblemDetailResponse.builder()
                     .errorCode(DomainErrorCode.BAD_REQUEST.getCode())
-                    .message(BAD_REQUEST_TITLE)
-                    .details("Required field is missing or null inside the request body.")
+                    .message(DomainErrorRegistry.metadataFor(DomainErrorCode.BAD_REQUEST).title())
+                    .details(MISSING_REQUIRED_FIELD_DETAILS)
                     .timestamp(Instant.now(clock).toString())
                     .traceId(currentTraceId())
                     .errors(errors)
@@ -122,7 +100,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ProblemDetailResponse.builder()
                     .errorCode(DomainErrorCode.BAD_REQUEST.getCode())
-                    .message(BAD_REQUEST_TITLE)
+                    .message(DomainErrorRegistry.metadataFor(DomainErrorCode.BAD_REQUEST).title())
                     .details("Invalid field type in request body.")
                     .timestamp(Instant.now(clock).toString())
                     .traceId(currentTraceId())
@@ -139,7 +117,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ProblemDetailResponse.builder()
                     .errorCode(DomainErrorCode.UNEXPECTED_ERROR.getCode())
-                    .message("Internal Server Error")
+                    .message(DomainErrorRegistry.metadataFor(DomainErrorCode.UNEXPECTED_ERROR).title())
                     .details("An unexpected error occurred. Please try again later.")
                     .timestamp(Instant.now(clock).toString())
                     .traceId(currentTraceId())

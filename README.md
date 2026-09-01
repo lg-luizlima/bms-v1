@@ -2,6 +2,26 @@
 
 Esse template utiliza o [MKDocs](https://www.mkdocs.org) como mecanismo padrão de documentação. A documentação está disponível dentro da pasta **docs** no diretório raiz do projeto.
 
+# Documentação da API (Swagger/OpenAPI)
+
+O microsserviço de Consentimentos atua como um roteador dinâmico de compliance: expõe os termos de um
+produto pendentes de aceite para um cliente (`GET /credit-core/v1/terms`) e registra o consentimento
+assinado por ele sobre esses termos (`POST /credit-core/v1/consents`). A documentação completa dos
+endpoints — descrições, exemplos de campo, obrigatoriedade e todas as respostas de erro possíveis — é
+gerada automaticamente via [springdoc-openapi](https://springdoc.org) e fica disponível no Swagger UI de
+cada ambiente:
+
+| Ambiente | Swagger UI | Base URL da API |
+|----------|------------|------------------|
+| Local | http://localhost:8082/swagger-ui/index.html | `http://localhost:8082` |
+| Homologação (hml) | https://fintech-hml.vivo.com.br/gateway/swagger-ui/index.html | `https://fintech-hml.vivo.com.br/gateway` |
+| Produção (prod) | https://fintech.vivo.com.br/gateway/swagger-ui/index.html | `https://fintech.vivo.com.br/gateway` |
+
+O JSON bruto da especificação OpenAPI (para importar em outras ferramentas) fica em `/v3/api-docs` do
+mesmo host. Convenções de anotação (`@Operation`, `@ApiResponse`, `@Schema`, etc.) para manter essa
+documentação atualizada ao adicionar/alterar endpoints estão descritas em
+[CLAUDE.md](CLAUDE.md#openapi-documentation).
+
 Para realizar a instalação dos pacotes necessários do [MKDocs](https://www.mkdocs.org/#installation), execute os comandos abaixo:
 
 ---

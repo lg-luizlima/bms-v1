@@ -191,7 +191,7 @@ adapters.
 
 ### Request flow
 
-`CreditCoreController` → `CustomerIdResolver` + `CreditCoreApiMapper` (DTO → command) →
+`CreditCoreControllerOpen` → `CustomerIdResolver` + `CreditCoreApiMapper` (DTO → command) →
 `CreateConsentPort`/`GetPendingTermsPort` → `CreateConsentUseCase`/`GetPendingTermsUseCase` →
 out-port interfaces → infrastructure adapters → mapper (domain → DTO) → `ResponseDTO<T>` envelope
 
@@ -203,6 +203,18 @@ Base path: `/credit-core/v1`
 |--------|------|-------------|-------------|----------|
 | GET | `/terms` | Get pending terms for a product | `authorization` | 200 `ActiveConsentResponseDTO` |
 | POST | `/consents` | Create customer consent | `authorization` | 201 `ConsentResponseDTO` (wrapped in `ResponseDTO` envelope) |
+
+**Possible error responses per endpoint** (all `ProblemDetailResponse`, documented as `@ApiResponse`s on
+`CreditCoreControllerOpenApi` — see "OpenAPI documentation" below):
+
+| Endpoint | Status | `DomainErrorCode`(s) |
+|----------|--------|-----------------------|
+| `GET /terms` | 400 | `MISSING_CUSTOMER_IDENTIFICATION`, `INVALID_CPF_PARAMETER` |
+| `GET /terms` | 404 | `PRODUCT_NOT_FOUND` |
+| `GET /terms` | 500 | `UNEXPECTED_ERROR` |
+| `POST /consents` | 400 | `BAD_REQUEST` (bean validation / malformed JSON), `MISSING_CUSTOMER_IDENTIFICATION`, `INVALID_CPF_PARAMETER` |
+| `POST /consents` | 422 | `INVALID_TERM`, `MANDATORY_TERM_NOT_ACCEPTED`, `TERM_NOT_FOUND`, `TERM_OUT_OF_VALIDITY` |
+| `POST /consents` | 500 | `UNEXPECTED_ERROR` |
 
 ### Key port contracts
 
@@ -276,9 +288,11 @@ Schema lives in the database's default `public` schema — no dedicated schema, 
 `BusinessException` is the base domain exception. Subclasses map to HTTP status via `ApiExceptionHandler` (RestControllerAdvice). All error responses follow `ProblemDetailResponse` format (errorCode, message, details, timestamp, traceId, errors list).
 
 `ApiExceptionHandler` has **one** `@ExceptionHandler(BusinessException.class)` plus the
-`MethodArgumentNotValid` override and a catch-all. Status comes from a
-`Map<DomainErrorCode, HttpStatus>` in that class — a new domain error is one enum constant plus one
-map entry, never another handler method.
+`MethodArgumentNotValid` override and a catch-all. Status and title come from
+`DomainErrorRegistry.metadataFor(DomainErrorCode)` (`api/rest/config/exceptionhandler/DomainErrorRegistry.java`)
+— a new domain error is one enum constant plus one registry entry, never another handler method. This
+registry is also what the Swagger doc generator reads (see "OpenAPI documentation" below), so the
+runtime error response and its documented example always agree.
 
 | `DomainErrorCode` | Code | HTTP Status |
 |-------------------|------|-------------|
@@ -289,6 +303,8 @@ map entry, never another handler method.
 | `PRODUCT_NOT_FOUND` | 4040 | 404 |
 | `INVALID_TERM` | 4221 | 422 |
 | `MANDATORY_TERM_NOT_ACCEPTED` | 4222 | 422 |
+| `TERM_NOT_FOUND` | 4223 | 422 |
+| `TERM_OUT_OF_VALIDITY` | 4224 | 422 |
 | `UNEXPECTED_ERROR` | 5000 | 500 |
 
 The numeric codes are part of the public contract — **append, never renumber**.
@@ -330,6 +346,84 @@ Every mapper sits **on a boundary**, and each boundary has exactly one:
 
 There is no `Mappers.getMapper()` `INSTANCE` field anywhere: `componentModel = "spring"` is the single
 instantiation strategy. Likewise `JsonSerializer` is the only JSON codec — do not `new ObjectMapper()`.
+
+### OpenAPI documentation
+
+Swagger UI (`/swagger-ui/index.html`, backed by `springdoc-openapi-starter-webmvc-ui`) is expected to be
+self-sufficient: a consumer should be able to understand and try the API from it without reading the
+source. `br/com/tlf/shared/configuration/OpenApiConfig.java` declares the API `Info` (title/description)
+and the three `Server` entries (local, hml, prod) shown in the Swagger UI server dropdown.
+
+**Project standard, going forward:**
+- Every controller endpoint gets `@Operation(summary, description)` and `@Parameter(description, ...)` on
+  each header/query param, plus `@ApiResponses` covering every HTTP status it can actually return —
+  including every `DomainErrorCode` that maps to that status (see the error-response tables under
+  "REST Endpoints" and "Exception hierarchy" above).
+- **Error responses: description and example JSON are defined once, not on `@ApiResponse`.** A Java
+  annotation attribute must be a compile-time constant, so `@ExampleObject`'s JSON can't be built from
+  `DomainErrorCode` data directly — instead, stack one `@ApiErrorResponse(description = "...", codes =
+  {DomainErrorCode.A, DomainErrorCode.B})` per HTTP status the endpoint can return
+  (`api/rest/config/openapi/ApiErrorResponse.java`, `@Repeatable`), grouping every code that maps to that
+  status under one human-authored sentence. `ApiErrorResponseCustomizer` (a springdoc
+  `OperationCustomizer`, same package) reads these at doc-generation time, sets that description onto the
+  matching `@ApiResponse(responseCode = ...)`, and builds one example per code from `DomainErrorRegistry`
+  via `JsonSerializer.toJsonNode(...)` — the same registry `ApiExceptionHandler` reads for the real
+  response, so the documented text can't drift from what the API actually returns. The `@ApiResponse`
+  itself still needs a bare `content = @Content(mediaType = ..., schema =
+  @Schema(implementation = ProblemDetailResponse.class))` — springdoc only registers `ProblemDetailResponse`
+  in `#/components/schemas` because of that annotation (it's never a controller return type), so removing
+  it would leave a dangling schema reference — but carries no `description` of its own, and the customizer
+  throws `IllegalStateException` at startup if the matching `@ApiResponse` is missing, if two codes in one
+  group resolve to different statuses, or if an example name collides with a hand-written one. A new
+  `DomainErrorCode` needs one `DomainErrorRegistry` entry to become usable in docs at all, and each
+  endpoint that can throw it still needs its own code added to the right `@ApiErrorResponse` group.
+- **When a code's example can't be derived from the registry alone, override it — never hand-type
+  JSON.** `POST /consents`'s `400` response needs an `errors[]` entry (`signature.deviceId must not be
+  blank`) that's specific to that endpoint's DTO, not a generic per-`DomainErrorCode` fact — so
+  `DomainErrorCode.BAD_REQUEST` is never listed in an `@ApiErrorResponse` group. Instead it gets
+  `@ApiErrorExampleOverride(code = DomainErrorCode.BAD_REQUEST, factory = BadRequestValidationExample.class)`
+  (`api/rest/config/openapi/ApiErrorExampleOverride.java`, `@Repeatable`), pointing at a small
+  `Supplier<ProblemDetailResponse>` in `api/rest/creditcore/doc/` that builds the example from the same
+  building blocks the real handler uses (`DomainErrorRegistry`, and
+  `ApiExceptionHandler.MISSING_REQUIRED_FIELD_DETAILS` — a `public static final` constant shared between
+  `ApiExceptionHandler.handleMethodArgumentNotValid` and this factory, so the `details` text can't drift
+  either) — only the illustrative field name/message are hand-authored, since those are genuinely
+  arbitrary per-DTO facts nothing can derive generically. `ApiErrorResponseCustomizer` processes both
+  `@ApiErrorResponse` and `@ApiErrorExampleOverride` through the same content-building/duplicate-name-guard
+  logic, so a hand-typed `@ExampleObject` should never be needed for an error response again.
+- **Success (2xx) responses: the example envelope is generated from the same runtime call the controller
+  makes, not hand-typed.** `ResponseDTO.message` used to carry a class-level `@Schema(example = ...)`,
+  which is wrong by construction for a generic wrapper reused across endpoints (confirmed live: it showed
+  one endpoint's message on the other's docs) — that attribute is gone now. Instead, each endpoint stacks
+  one `@ApiSuccessExample(name = "...", factory = SomeExample.class)`
+  (`api/rest/config/openapi/ApiSuccessExample.java`, `@Repeatable`) per realistic outcome it wants to show
+  — `getActiveConsents` shows three (`NO_PENDING_TERMS`/`OPTIONAL_PENDING_TERM`/`MANDATORY_PENDING_TERM`,
+  see `GetActiveConsentsNoPendingTermsExample`/`OptionalPendingTermExample`/`MandatoryPendingTermExample`
+  in `api/rest/creditcore/doc/`), `createConsent` shows one (`SUCCESS`). Each factory is a small
+  `Supplier<ResponseDTO<T>>` whose `get()` calls the *exact same* `ResponseDTO.ok(...)`/`.success(...)`
+  factory and the *exact same* message constant (declared once on the `<Name>ControllerApi` interface,
+  e.g. `GET_TERMS_SUCCESS_MESSAGE`, and referenced by both the factory and the real controller method)
+  that the controller itself uses — only the sample `data` is illustrative; `status`/`message` are
+  structurally guaranteed to match a real response. `ApiSuccessExampleCustomizer` instantiates each
+  factory and attaches the results to the operation's one `2xx` response, throwing
+  `IllegalStateException` if two examples on the same operation share a `name`.
+- **The doc annotations live on a `<Name>ControllerApi` interface, not on the controller class.**
+  `@Tag`, `@Operation`, `@ApiResponses`, `@ApiErrorResponse`/`@ApiErrorExampleOverride`,
+  `@ApiSuccessExample`, `@Parameter`, and the Spring MVC mapping annotations
+  (`@GetMapping`/`@PostMapping`/`@ResponseStatus`) all sit on the interface's method signatures. The
+  controller class only declares `@RestController`, `@RequiredArgsConstructor`, the class-level
+  `@RequestMapping(basePath)`, its constructor-injected fields, and `@Override` method bodies free of any
+  repeated annotations — Spring MVC resolves the route/param binding and springdoc reads the docs straight
+  off the interface method, so nothing is duplicated between the two files. This exists because a
+  controller with more than one or two endpoints and full `@ApiResponses` coverage becomes mostly
+  annotation noise around a handful of lines of actual wiring.
+  `CreditCoreControllerOpenApi`/`CreditCoreControllerOpen` is the reference implementation.
+- Every DTO field (request or response, including the shared `ResponseDTO`/`ProblemDetailResponse`
+  envelopes) gets `@Schema(description, example, requiredMode)` — `requiredMode = REQUIRED` when the
+  field carries `@NotNull`/`@NotBlank`/`@NotEmpty`, `NOT_REQUIRED` otherwise. `AcceptedTermDTO` is the
+  reference implementation.
+- Adding a new `DomainErrorCode` (see "Exception hierarchy" above) means updating every endpoint's
+  `@ApiResponses`/`@ApiErrorResponse` groups that can throw it, not just the `DomainErrorRegistry` entry.
 
 ## Profiles & Environment
 

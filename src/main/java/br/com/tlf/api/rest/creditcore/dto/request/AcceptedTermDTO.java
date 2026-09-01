@@ -22,11 +22,13 @@ public class AcceptedTermDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @NotNull
-    @Schema(description = "Term identifier (UUID)", example = "41dfaa2f-3fee-432f-96a0-ffee95cfb2be")
+    @Schema(description = "Term identifier (UUID)", example = "41dfaa2f-3fee-432f-96a0-ffee95cfb2be",
+            requiredMode = Schema.RequiredMode.REQUIRED)
     @JsonProperty("termId")
     private UUID termId;
 
     @NotNull
-    @Schema(description = "Whether the user opted in", example = "true")
+    @Schema(description = "Whether the user opted in", example = "true",
+            requiredMode = Schema.RequiredMode.REQUIRED)
     private Boolean optIn;
 }

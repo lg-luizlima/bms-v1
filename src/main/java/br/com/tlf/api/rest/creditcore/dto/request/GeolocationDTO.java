@@ -1,6 +1,7 @@
 package br.com.tlf.api.rest.creditcore.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,10 +21,14 @@ public class GeolocationDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @NotBlank
+    @Schema(description = "Latitude at signature time", example = "-23.55052",
+            requiredMode = Schema.RequiredMode.REQUIRED)
     @JsonProperty("lat")
     private String lat;
 
     @NotBlank
+    @Schema(description = "Longitude at signature time", example = "-46.633308",
+            requiredMode = Schema.RequiredMode.REQUIRED)
     @JsonProperty("long")
     private String lon;
 }
