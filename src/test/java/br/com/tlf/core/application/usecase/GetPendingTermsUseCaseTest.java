@@ -11,6 +11,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -38,6 +42,8 @@ import br.com.tlf.dummies.CustomerConsentDummies;
 @ExtendWith(MockitoExtension.class)
 class GetPendingTermsUseCaseTest {
 
+    private static final String OTHER_PRODUCT = "CREDITO_PESSOAL";
+
     @Mock private TermsCatalogRepository termsCatalogRepository;
     @Mock private CustomerConsentRepository customerConsentRepository;
 
@@ -47,8 +53,14 @@ class GetPendingTermsUseCaseTest {
         return new GetPendingTermsUseCase(termsCatalogRepository, customerConsentRepository, termsCatalogMapper);
     }
 
-    private PendingTermsResult execute(String product) {
+    private List<PendingTermsResult> execute(String product) {
         return underTest().execute(new PendingTermsQuery(CUSTOMER_ID, product, CORRELATION_ID, CHANNEL_ID));
+    }
+
+    private PendingTermsResult executeSingle(String product) {
+        List<PendingTermsResult> results = execute(product);
+        assertThat(results).hasSize(1);
+        return results.getFirst();
     }
 
     @Test
@@ -60,7 +72,7 @@ class GetPendingTermsUseCaseTest {
                         REVOKED_TERM_CODE, CustomerConsentDummies.revokedTermConsent(),
                         SOFT_TERM_CODE, CustomerConsentDummies.softTermConsent()));
 
-        PendingTermsResult result = execute(PRODUCT);
+        PendingTermsResult result = executeSingle(PRODUCT);
 
         assertThat(result.product()).isEqualTo(PRODUCT);
         assertThat(result.pendingTerms()).isEmpty();
@@ -74,7 +86,7 @@ class GetPendingTermsUseCaseTest {
         when(customerConsentRepository.findActiveConsentsByTermCode(eq(CUSTOMER_ID), anyCollection()))
                 .thenReturn(Map.of(SOFT_TERM_CODE, CustomerConsentDummies.softTermConsent()));
 
-        PendingTermsResult result = execute(PRODUCT);
+        PendingTermsResult result = executeSingle(PRODUCT);
 
         assertThat(result.hasPendingMandatoryTerms()).isTrue();
         assertThat(result.pendingTerms()).extracting(PendingTerm::termCode).containsExactly(REVOKED_TERM_CODE);
@@ -89,7 +101,7 @@ class GetPendingTermsUseCaseTest {
         when(customerConsentRepository.findActiveConsentsByTermCode(eq(CUSTOMER_ID), anyCollection()))
                 .thenReturn(Map.of(REVOKED_TERM_CODE, CustomerConsentDummies.revokedTermConsent()));
 
-        PendingTermsResult result = execute(PRODUCT);
+        PendingTermsResult result = executeSingle(PRODUCT);
 
         assertThat(result.hasPendingMandatoryTerms()).isFalse();
         assertThat(result.pendingTerms()).extracting(PendingTerm::termCode).containsExactly(SOFT_TERM_CODE);
@@ -103,7 +115,7 @@ class GetPendingTermsUseCaseTest {
                 .thenReturn(Map.of(SOFT_TERM_CODE,
                         CustomerConsentDummies.consentWithTermId(UUID.randomUUID(), SOFT_TERM_CODE)));
 
-        assertThat(execute(PRODUCT).pendingTerms()).isEmpty();
+        assertThat(executeSingle(PRODUCT).pendingTerms()).isEmpty();
     }
 
     @Test
@@ -114,7 +126,7 @@ class GetPendingTermsUseCaseTest {
                 .thenReturn(Map.of(REVOKED_TERM_CODE,
                         CustomerConsentDummies.consentWithTermId(UUID.randomUUID(), REVOKED_TERM_CODE)));
 
-        assertThat(execute(PRODUCT).pendingTerms()).extracting(PendingTerm::termCode)
+        assertThat(executeSingle(PRODUCT).pendingTerms()).extracting(PendingTerm::termCode)
                 .containsExactly(REVOKED_TERM_CODE);
     }
 
@@ -129,23 +141,10 @@ class GetPendingTermsUseCaseTest {
         when(customerConsentRepository.findActiveConsentsByTermCode(eq(CUSTOMER_ID), anyCollection()))
                 .thenReturn(Map.of());
 
-        PendingTermsResult result = execute(PRODUCT);
+        PendingTermsResult result = executeSingle(PRODUCT);
 
         assertThat(result.pendingTerms()).hasSize(1);
         assertThat(result.pendingTerms().getFirst().termId()).isEqualTo(REVOKED_TERM_ID.toString());
-    }
-
-    @Test
-    void nullProduct_returnsResultWithoutProductAndWithoutThrowing() {
-        when(termsCatalogRepository.findVigentTerms(null))
-                .thenReturn(TermsCatalog.of(List.of(CreditTermDummies.revokedTerm())));
-        when(customerConsentRepository.findActiveConsentsByTermCode(eq(CUSTOMER_ID), anyCollection()))
-                .thenReturn(Map.of());
-
-        PendingTermsResult result = execute(null);
-
-        assertThat(result.product()).isNull();
-        assertThat(result.pendingTerms()).hasSize(1);
     }
 
     @Test
@@ -156,14 +155,63 @@ class GetPendingTermsUseCaseTest {
     }
 
     @Test
-    void nullProductAndNoVigentTerms_returnsEmptyResult() {
-        when(termsCatalogRepository.findVigentTerms(null)).thenReturn(TermsCatalog.of(List.of()));
+    void productGiven_zeroPendingTerms_stillReturnsSingleObjectWithEmptyPendingTerms() {
+        when(termsCatalogRepository.findVigentTerms(PRODUCT))
+                .thenReturn(TermsCatalog.of(List.of(CreditTermDummies.revokedTerm(), CreditTermDummies.softTerm())));
         when(customerConsentRepository.findActiveConsentsByTermCode(eq(CUSTOMER_ID), anyCollection()))
-                .thenReturn(Map.of());
+                .thenReturn(Map.of(
+                        REVOKED_TERM_CODE, CustomerConsentDummies.revokedTermConsent(),
+                        SOFT_TERM_CODE, CustomerConsentDummies.softTermConsent()));
 
-        PendingTermsResult result = execute(null);
+        List<PendingTermsResult> results = execute(PRODUCT);
 
-        assertThat(result.pendingTerms()).isEmpty();
-        assertThat(result.hasPendingMandatoryTerms()).isFalse();
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().product()).isEqualTo(PRODUCT);
+        assertThat(results.getFirst().pendingTerms()).isEmpty();
+    }
+
+    @Test
+    void productOmitted_pendingInSomeButNotAllProducts_returnsOneEntryPerProductWithPending() {
+        TermsCatalogEntry productAOnlyTerm = CreditTermDummies.revokedTerm();
+        TermsCatalogEntry productBOnlyTerm = CreditTermDummies.softTerm();
+        TermsCatalogEntry productCFullySignedTerm = CreditTermDummies.revokedTerm().toBuilder()
+                .id(UUID.randomUUID())
+                .termCode("ALREADY_SIGNED_TERM")
+                .build();
+
+        when(termsCatalogRepository.findVigentTermsGroupedByProduct()).thenReturn(Map.of(
+                PRODUCT, TermsCatalog.of(List.of(productAOnlyTerm)),
+                OTHER_PRODUCT, TermsCatalog.of(List.of(productBOnlyTerm)),
+                "FULLY_SIGNED_PRODUCT", TermsCatalog.of(List.of(productCFullySignedTerm))));
+        when(customerConsentRepository.findActiveConsentsByTermCode(eq(CUSTOMER_ID), anyCollection()))
+                .thenReturn(Map.of("ALREADY_SIGNED_TERM",
+                        CustomerConsentDummies.consentWithTermId(productCFullySignedTerm.id(), "ALREADY_SIGNED_TERM")));
+
+        List<PendingTermsResult> results = execute(null);
+
+        assertThat(results).hasSize(2);
+        assertThat(results).extracting(PendingTermsResult::product).containsExactlyInAnyOrder(PRODUCT, OTHER_PRODUCT);
+        verify(customerConsentRepository, times(1)).findActiveConsentsByTermCode(eq(CUSTOMER_ID), anyCollection());
+    }
+
+    @Test
+    void productOmitted_noVigentTermsAnywhere_returnsEmptyListNotException() {
+        when(termsCatalogRepository.findVigentTermsGroupedByProduct()).thenReturn(Map.of());
+
+        List<PendingTermsResult> results = execute(null);
+
+        assertThat(results).isEmpty();
+        verifyNoInteractions(customerConsentRepository);
+    }
+
+    @Test
+    void productOmitted_allProductsFullySigned_returnsEmptyList() {
+        when(termsCatalogRepository.findVigentTermsGroupedByProduct())
+                .thenReturn(Map.of(PRODUCT, TermsCatalog.of(List.of(CreditTermDummies.revokedTerm()))));
+        when(customerConsentRepository.findActiveConsentsByTermCode(eq(CUSTOMER_ID), anyCollection()))
+                .thenReturn(Map.of(REVOKED_TERM_CODE, CustomerConsentDummies.revokedTermConsent()));
+
+        assertThat(execute(null)).isEmpty();
+        verify(termsCatalogRepository, never()).findVigentTerms(null);
     }
 }

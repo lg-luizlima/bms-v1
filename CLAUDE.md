@@ -251,7 +251,7 @@ annotated private method is never intercepted by Spring's proxy-based AOP anyway
 
 ### Domain model
 
-The service manages versioned **terms catalogs** per product (e.g. `EP_INSS`) and records customer
+The service manages versioned **terms catalogs** per product (e.g. `CREDITO_PESSOAL`) and records customer
 **consents** (accepted terms + audit signature).
 
 **CPF is stored, cached and published in the clear — deliberately, and it must stay that way.** It is

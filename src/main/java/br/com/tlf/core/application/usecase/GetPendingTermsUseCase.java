@@ -1,7 +1,11 @@
 package br.com.tlf.core.application.usecase;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
@@ -29,33 +33,70 @@ public class GetPendingTermsUseCase implements GetPendingTermsPort {
     private final TermsCatalogMapper termsCatalogMapper;
 
     @Override
-    public PendingTermsResult execute(PendingTermsQuery query) {
-        TermsCatalog vigentTerms = termsCatalogRepository.findVigentTerms(query.product());
+    public List<PendingTermsResult> execute(PendingTermsQuery query) {
+        return query.product() != null
+                ? List.of(singleProductResult(query))
+                : allProductsResults(query);
+    }
 
-        if (vigentTerms.isEmpty() && query.product() != null) {
+    private PendingTermsResult singleProductResult(PendingTermsQuery query) {
+        TermsCatalog vigentTerms = termsCatalogRepository.findVigentTerms(query.product());
+        if (vigentTerms.isEmpty()) {
             throw new ProductNotFoundException("Product not found.",
                     List.of("No product was found for " + query.product()));
         }
 
         TermsCatalog currentTerms = vigentTerms.latestVersionPerTermCode();
-        List<TermsCatalogEntry> pendingEntries = pendingEntries(query.customerId(), currentTerms);
+        Map<String, CustomerConsent> activeConsents = customerConsentRepository.findActiveConsentsByTermCode(
+                query.customerId(), currentTerms.entries().stream().map(TermsCatalogEntry::termCode).toList());
 
+        List<TermsCatalogEntry> pendingEntries = pendingEntries(currentTerms, activeConsents);
         log.info("[getPendingTerms] product={} correlationId={} pendingTerms={}",
                 query.product(), query.correlationId(), pendingEntries.size());
 
-        List<PendingTerm> pendingTerms = termsCatalogMapper.toPendingTerms(pendingEntries);
+        return buildResult(query.product(), pendingEntries);
+    }
 
+    private List<PendingTermsResult> allProductsResults(PendingTermsQuery query) {
+        Map<String, TermsCatalog> catalogsByProduct = termsCatalogRepository.findVigentTermsGroupedByProduct();
+        if (catalogsByProduct.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, TermsCatalog> currentTermsByProduct = new LinkedHashMap<>();
+        Set<String> allTermCodes = new LinkedHashSet<>();
+        catalogsByProduct.forEach((product, catalog) -> {
+            TermsCatalog currentTerms = catalog.latestVersionPerTermCode();
+            currentTermsByProduct.put(product, currentTerms);
+            currentTerms.entries().forEach(entry -> allTermCodes.add(entry.termCode()));
+        });
+
+        Map<String, CustomerConsent> activeConsents =
+                customerConsentRepository.findActiveConsentsByTermCode(query.customerId(), allTermCodes);
+
+        List<PendingTermsResult> results = new ArrayList<>();
+        currentTermsByProduct.forEach((product, currentTerms) -> {
+            List<TermsCatalogEntry> pendingEntries = pendingEntries(currentTerms, activeConsents);
+            if (!pendingEntries.isEmpty()) {
+                log.info("[getPendingTerms] product={} correlationId={} pendingTerms={}",
+                        product, query.correlationId(), pendingEntries.size());
+                results.add(buildResult(product, pendingEntries));
+            }
+        });
+        return results;
+    }
+
+    private PendingTermsResult buildResult(String product, List<TermsCatalogEntry> pendingEntries) {
+        List<PendingTerm> pendingTerms = termsCatalogMapper.toPendingTerms(pendingEntries);
         return PendingTermsResult.builder()
-                .product(query.product())
+                .product(product)
                 .hasPendingMandatoryTerms(pendingEntries.stream().anyMatch(TermsCatalogEntry::isMandatoryTerm))
                 .pendingTerms(pendingTerms)
                 .build();
     }
 
-    private List<TermsCatalogEntry> pendingEntries(String customerId, TermsCatalog currentTerms) {
-        Map<String, CustomerConsent> activeConsents = customerConsentRepository.findActiveConsentsByTermCode(
-                customerId, currentTerms.entries().stream().map(TermsCatalogEntry::termCode).toList());
-
+    private List<TermsCatalogEntry> pendingEntries(TermsCatalog currentTerms,
+            Map<String, CustomerConsent> activeConsents) {
         return currentTerms.entries().stream()
                 .filter(entry -> !isSigned(activeConsents, entry))
                 .toList();

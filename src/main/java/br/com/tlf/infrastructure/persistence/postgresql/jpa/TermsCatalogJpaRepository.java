@@ -21,4 +21,11 @@ public interface TermsCatalogJpaRepository extends JpaRepository<TermsCatalogJpa
           )
         """, nativeQuery = true)
     List<TermsCatalogJpaEntity> findVigentTerms(@Param("product") String product);
+
+    @Query(value = """
+        SELECT tp.term_id AS termId, tp.product AS product
+        FROM tb_term_products tp
+        WHERE tp.term_id IN (:termIds)
+        """, nativeQuery = true)
+    List<TermProductProjection> findProductsByTermIds(@Param("termIds") List<UUID> termIds);
 }

@@ -1,15 +1,17 @@
 package br.com.tlf.api.rest.creditcore;
 
+import java.util.List;
+
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.com.tlf.api.rest.UrlConstant;
 import br.com.tlf.api.rest.creditcore.dto.request.ConsentRequestDTO;
-import br.com.tlf.api.rest.creditcore.dto.response.ActiveConsentResponseDTO;
 import br.com.tlf.api.rest.creditcore.dto.response.ConsentResponseDTO;
 import br.com.tlf.api.rest.creditcore.mapper.CreditCoreApiMapper;
 import br.com.tlf.api.rest.creditcore.resolver.CustomerIdResolver;
 import br.com.tlf.api.rest.shared.ResponseDTO;
+import br.com.tlf.core.domain.terms.PendingTermsResult;
 import br.com.tlf.core.port.in.CreateConsentPort;
 import br.com.tlf.core.port.in.GetPendingTermsPort;
 import br.com.tlf.core.port.in.command.PendingTermsQuery;
@@ -26,14 +28,18 @@ public class CreditCoreControllerOpen implements CreditCoreControllerOpenApi {
     private final CreditCoreApiMapper apiMapper;
 
     @Override
-    public ResponseDTO<ActiveConsentResponseDTO> getActiveConsents(String authorization, String product,
+    public ResponseDTO<Object> getActiveConsents(String authorization, String product,
             String channelId, String correlationId, String customerId) {
 
         PendingTermsQuery query = new PendingTermsQuery(
                 customerIdResolver.resolve(authorization, customerId), product, correlationId, channelId);
 
-        return ResponseDTO.ok(apiMapper.toResponse(getPendingTermsPort.execute(query)),
-                GET_TERMS_SUCCESS_MESSAGE);
+        List<PendingTermsResult> results = getPendingTermsPort.execute(query);
+        Object data = product != null
+                ? apiMapper.toResponse(results.getFirst())
+                : apiMapper.toResponse(results);
+
+        return ResponseDTO.ok(data, GET_TERMS_SUCCESS_MESSAGE);
     }
 
     @Override

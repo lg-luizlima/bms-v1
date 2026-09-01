@@ -1,5 +1,7 @@
 package br.com.tlf.api.rest.creditcore.mapper;
 
+import java.util.List;
+
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -27,6 +29,8 @@ public interface CreditCoreApiMapper {
     Geolocation toGeolocation(GeolocationDTO geolocationDTO);
 
     ActiveConsentResponseDTO toResponse(PendingTermsResult result);
+
+    List<ActiveConsentResponseDTO> toResponse(List<PendingTermsResult> results);
 
     ConsentResponseDTO toResponse(ConsentReceipt receipt);
 }

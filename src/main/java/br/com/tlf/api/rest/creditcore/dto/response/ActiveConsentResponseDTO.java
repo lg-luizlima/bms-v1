@@ -23,7 +23,7 @@ public class ActiveConsentResponseDTO implements Serializable {
     @Serial
     private static final long serialVersionUID = 203752103527580588L;
 
-    @Schema(description = "Product the pending terms belong to", example = "EP_INSS",
+    @Schema(description = "Product the pending terms belong to", example = "CREDITO_PESSOAL",
             requiredMode = Schema.RequiredMode.REQUIRED)
     @JsonProperty("product")
     private String product;

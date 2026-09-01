@@ -16,11 +16,11 @@ import br.com.tlf.api.rest.config.openapi.ApiErrorResponse;
 import br.com.tlf.api.rest.config.openapi.ApiSuccessExample;
 import br.com.tlf.api.rest.creditcore.doc.BadRequestValidationExample;
 import br.com.tlf.api.rest.creditcore.doc.CreateConsentSuccessExample;
+import br.com.tlf.api.rest.creditcore.doc.GetActiveConsentsAllProductsExample;
 import br.com.tlf.api.rest.creditcore.doc.GetActiveConsentsMandatoryPendingTermExample;
 import br.com.tlf.api.rest.creditcore.doc.GetActiveConsentsNoPendingTermsExample;
 import br.com.tlf.api.rest.creditcore.doc.GetActiveConsentsOptionalPendingTermExample;
 import br.com.tlf.api.rest.creditcore.dto.request.ConsentRequestDTO;
-import br.com.tlf.api.rest.creditcore.dto.response.ActiveConsentResponseDTO;
 import br.com.tlf.api.rest.creditcore.dto.response.ConsentResponseDTO;
 import br.com.tlf.api.rest.shared.ResponseDTO;
 import br.com.tlf.core.domain.exception.DomainErrorCode;
@@ -53,7 +53,12 @@ public interface CreditCoreControllerOpenApi {
 
     @Operation(summary = "Retorna os termos pendentes de um produto",
         description = "Lista, para o cliente identificado, os termos vigentes de um produto que ainda não "
-            + "foram aceitos (ou cujo aceite anterior foi invalidado por uma nova versão do termo).")
+            + "foram aceitos (ou cujo aceite anterior foi invalidado por uma nova versão do termo). Se o "
+            + "parâmetro 'product' não for informado, retorna em 'data' uma lista com um item por produto que "
+            + "possua ao menos um termo pendente (produtos sem termos pendentes não aparecem na lista); se não "
+            + "houver nenhum termo vigente em nenhum produto, retorna uma lista vazia. Quando 'product' é "
+            + "informado, 'data' continua sendo um único objeto (mesmo formato de hoje), inclusive quando não "
+            + "há termos pendentes (lista de termos vazia).")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Termos pendentes retornados com sucesso"),
         @ApiResponse(responseCode = "400", content = @Content(mediaType = PROBLEM_DETAIL_MEDIA_TYPE,
@@ -66,6 +71,7 @@ public interface CreditCoreControllerOpenApi {
     @ApiSuccessExample(name = "NO_PENDING_TERMS", factory = GetActiveConsentsNoPendingTermsExample.class)
     @ApiSuccessExample(name = "OPTIONAL_PENDING_TERM", factory = GetActiveConsentsOptionalPendingTermExample.class)
     @ApiSuccessExample(name = "MANDATORY_PENDING_TERM", factory = GetActiveConsentsMandatoryPendingTermExample.class)
+    @ApiSuccessExample(name = "ALL_PRODUCTS_PENDING", factory = GetActiveConsentsAllProductsExample.class)
     @ApiErrorResponse(description = "Requisição inválida: identificação do cliente ausente ou CPF inválido",
         codes = {DomainErrorCode.MISSING_CUSTOMER_IDENTIFICATION, DomainErrorCode.INVALID_CPF_PARAMETER})
     @ApiErrorResponse(description = "Produto não encontrado", codes = DomainErrorCode.PRODUCT_NOT_FOUND)
@@ -73,12 +79,13 @@ public interface CreditCoreControllerOpenApi {
     @GetMapping(UrlConstant.TERMS_URI)
     @ResponseStatus(HttpStatus.OK)
 
-    ResponseDTO<ActiveConsentResponseDTO> getActiveConsents(
+    ResponseDTO<Object> getActiveConsents(
 
         @Parameter(description = AUTHORIZATION_HEADER_DESCRIPTION, required = true)
         @RequestHeader String authorization,
 
-        @Parameter(description = "Código do produto cujos termos serão consultados", example = "EP_INSS")
+        @Parameter(description = "Código do produto cujos termos serão consultados. Se omitido, retorna "
+            + "todos os produtos do cliente com termos pendentes de assinatura.", example = "CREDITO_PESSOAL")
         @RequestParam(required = false) String product,
 
         @Parameter(description = CHANNEL_ID_HEADER_DESCRIPTION, required = true, example = CHANNEL_ID_EXAMPLE)

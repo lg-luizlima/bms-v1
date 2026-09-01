@@ -208,11 +208,11 @@ class CreditCoreControllerTest {
 
     @Test
     void getActiveConsents_returns200WithPendingTerms() throws Exception {
-        when(getPendingTermsPort.execute(any())).thenReturn(PendingTermsResult.builder()
+        when(getPendingTermsPort.execute(any())).thenReturn(List.of(PendingTermsResult.builder()
                 .product("CONSIGNADO_DATAPREV")
                 .hasPendingMandatoryTerms(true)
                 .pendingTerms(List.of(new PendingTerm("term-1", "DATAPREV_AUTH", "Título", "Resumo", null, true)))
-                .build());
+                .build()));
 
         mockMvc.perform(get(TERMS_URL)
                         .param("product", "CONSIGNADO_DATAPREV")
@@ -222,7 +222,48 @@ class CreditCoreControllerTest {
                         .header("x-customer-id", ConsentRequestDummies.CPF_PLAIN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ok"))
+                .andExpect(jsonPath("$.data").isMap())
                 .andExpect(jsonPath("$.data.hasPendingMandatoryTerms").value(true))
                 .andExpect(jsonPath("$.data.pendingTerms[0].termCode").value("DATAPREV_AUTH"));
+    }
+
+    @Test
+    void getActiveConsents_productOmitted_returns200WithArrayOfProducts() throws Exception {
+        when(getPendingTermsPort.execute(any())).thenReturn(List.of(
+                PendingTermsResult.builder()
+                        .product("CONSIGNADO_DATAPREV")
+                        .hasPendingMandatoryTerms(true)
+                        .pendingTerms(List.of(new PendingTerm("term-1", "DATAPREV_AUTH", "Título", "Resumo", null, true)))
+                        .build(),
+                PendingTermsResult.builder()
+                        .product("CREDITO_PESSOAL")
+                        .hasPendingMandatoryTerms(false)
+                        .pendingTerms(List.of(new PendingTerm("term-2", "COMMUNICATION_TERMS", "Título 2", "Resumo 2", null, false)))
+                        .build()));
+
+        mockMvc.perform(get(TERMS_URL)
+                        .header("authorization", ConsentRequestDummies.BEARER_TOKEN)
+                        .header("x-channel-id", ConsentRequestDummies.CHANNEL_ID)
+                        .header("x-correlation-id", ConsentRequestDummies.CORRELATION_ID)
+                        .header("x-customer-id", ConsentRequestDummies.CPF_PLAIN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].product").value("CONSIGNADO_DATAPREV"))
+                .andExpect(jsonPath("$.data[1].product").value("CREDITO_PESSOAL"));
+    }
+
+    @Test
+    void getActiveConsents_productOmitted_nothingPending_returns200WithEmptyArray() throws Exception {
+        when(getPendingTermsPort.execute(any())).thenReturn(List.of());
+
+        mockMvc.perform(get(TERMS_URL)
+                        .header("authorization", ConsentRequestDummies.BEARER_TOKEN)
+                        .header("x-channel-id", ConsentRequestDummies.CHANNEL_ID)
+                        .header("x-correlation-id", ConsentRequestDummies.CORRELATION_ID)
+                        .header("x-customer-id", ConsentRequestDummies.CPF_PLAIN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
     }
 }
