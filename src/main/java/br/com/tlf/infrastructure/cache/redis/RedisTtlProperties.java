@@ -15,11 +15,11 @@ import lombok.Setter;
 @ConfigurationProperties(prefix = "redis.ttl")
 public class RedisTtlProperties {
 
-    private long syncStatusSeconds = 86400L;
+    private long syncConsentStatusSeconds = 86400L;
     private long consentIdempotencyCheckSeconds = 60L;
 
-    public Duration syncStatus() {
-        return Duration.ofSeconds(syncStatusSeconds);
+    public Duration syncConsentStatus() {
+        return Duration.ofSeconds(syncConsentStatusSeconds);
     }
 
     public Duration consentIdempotencyCheck() {

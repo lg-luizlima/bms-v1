@@ -10,5 +10,6 @@ public interface ConsentCachePort {
 
     void writeCacheIdempotentResponse(String customerId, String correlationId, Instant consentReceivedAt);
 
-    void writeSyncStatus(String customerId);
+
+    void ensureProcessing(String customerId, String termCode);
 }

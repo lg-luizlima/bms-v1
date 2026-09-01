@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class RedisConsentCacheAdapter implements ConsentCachePort {
 
-    private static final String SYNC_STATUS_PROCESSING = "PROCESSING";
+    private static final String PROCESSING = "PROCESSING";
 
     private final StringRedisTemplate redisTemplate;
     private final ObservationRegistry observationRegistry;
@@ -55,15 +55,24 @@ public class RedisConsentCacheAdapter implements ConsentCachePort {
     }
 
     @Override
-    public void writeSyncStatus(String customerId) {
-        String key = RedisKeys.syncStatus(customerId);
+    public void ensureProcessing(String customerId, String termCode) {
+        String key = RedisKeys.syncConsentStatus(customerId);
 
-        observed("redis.sync_status.write", "SET sync_status", "SET", key, SYNC_STATUS_PROCESSING,
-                () -> {
-                    redisTemplate.opsForValue().set(key, SYNC_STATUS_PROCESSING, ttl.syncStatus());
-                    return null;
-                },
-                ex -> log.warn("[writeSyncStatus] Redis unavailable, sync status not cached: {}", ex.getMessage()));
+        Boolean fieldWasAbsent = observed("redis.consent_status.ensure_processing", "HSETNX sync_consent_status",
+                "HSETNX", key, PROCESSING,
+                () -> redisTemplate.<String, String>opsForHash().putIfAbsent(key, termCode, PROCESSING),
+                ex -> log.warn("[ensureProcessing] Redis unavailable, status not cached for termCode {}: {}",
+                        termCode, ex.getMessage()));
+
+        if (Boolean.TRUE.equals(fieldWasAbsent)) {
+            observed("redis.consent_status.expire", "EXPIRE sync_consent_status", "EXPIRE", key, null,
+                    () -> {
+                        redisTemplate.expire(key, ttl.syncConsentStatus());
+                        return null;
+                    },
+                    ex -> log.warn("[ensureProcessing] Redis unavailable, TTL not set for termCode {}: {}",
+                            termCode, ex.getMessage()));
+        }
     }
 
     /**

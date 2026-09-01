@@ -1,6 +1,7 @@
 package br.com.tlf.infrastructure.cache.redis;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
@@ -25,11 +27,13 @@ class RedisConsentCacheAdapterTest {
 
     private static final String CUSTOMER_ID = "52998224725";
     private static final String CORRELATION_ID = "correlation-1";
+    private static final String TERM_CODE = "DATAPREV_CONSENT";
     private static final String IDEMPOTENCY_KEY = "post_consent_idempotency:52998224725:correlation-1";
-    private static final String SYNC_STATUS_KEY = "sync_status:52998224725";
+    private static final String SYNC_CONSENT_STATUS_KEY = "sync_consent_status:52998224725";
 
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private ValueOperations<String, String> valueOperations;
+    @Mock private HashOperations<String, String, String> hashOperations;
 
     private RedisConsentCacheAdapter underTest;
 
@@ -84,20 +88,32 @@ class RedisConsentCacheAdapterTest {
     }
 
     @Test
-    void writeSyncStatus_writesProcessingWithConfiguredTtl() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+    void ensureProcessing_setsProcessingAndExpiresWhenAbsent() {
+        when(redisTemplate.<String, String>opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.putIfAbsent(SYNC_CONSENT_STATUS_KEY, TERM_CODE, "PROCESSING")).thenReturn(true);
 
-        underTest.writeSyncStatus(CUSTOMER_ID);
+        underTest.ensureProcessing(CUSTOMER_ID, TERM_CODE);
 
-        verify(valueOperations).set(SYNC_STATUS_KEY, "PROCESSING", Duration.ofSeconds(86400));
+        verify(hashOperations).putIfAbsent(SYNC_CONSENT_STATUS_KEY, TERM_CODE, "PROCESSING");
+        verify(redisTemplate).expire(SYNC_CONSENT_STATUS_KEY, Duration.ofSeconds(86400));
     }
 
     @Test
-    void writeSyncStatus_redisDown_isSwallowed() {
-        when(redisTemplate.opsForValue()).thenThrow(new RedisConnectionFailureException("down"));
+    void ensureProcessing_doesNotTouchTtlWhenAlreadyPresent() {
+        when(redisTemplate.<String, String>opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.putIfAbsent(SYNC_CONSENT_STATUS_KEY, TERM_CODE, "PROCESSING")).thenReturn(false);
 
-        underTest.writeSyncStatus(CUSTOMER_ID);
+        underTest.ensureProcessing(CUSTOMER_ID, TERM_CODE);
 
-        verify(redisTemplate).opsForValue();
+        verify(redisTemplate, never()).expire(SYNC_CONSENT_STATUS_KEY, Duration.ofSeconds(86400));
+    }
+
+    @Test
+    void ensureProcessing_redisDown_isSwallowed() {
+        when(redisTemplate.<String, String>opsForHash()).thenThrow(new RedisConnectionFailureException("down"));
+
+        underTest.ensureProcessing(CUSTOMER_ID, TERM_CODE);
+
+        verify(redisTemplate, never()).expire(SYNC_CONSENT_STATUS_KEY, Duration.ofSeconds(86400));
     }
 }

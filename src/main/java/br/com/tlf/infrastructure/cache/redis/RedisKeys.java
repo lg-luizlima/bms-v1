@@ -6,8 +6,8 @@ final class RedisKeys {
     private RedisKeys() {
     }
 
-    static String syncStatus(String customerId) {
-        return "sync_status:" + customerId;
+    static String syncConsentStatus(String customerId) {
+        return "sync_consent_status:" + customerId;
     }
 
     static String postConsentIdempotency(String customerId, String correlationId) {

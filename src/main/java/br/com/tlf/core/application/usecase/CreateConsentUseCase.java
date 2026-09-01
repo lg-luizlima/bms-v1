@@ -60,9 +60,7 @@ public class CreateConsentUseCase implements CreateConsentPort {
 
         eventHubPort.publishConsentRequested(command.acceptedTerms(), command.signature());
 
-        if (registerConsents(command, termsById)) {
-            consentCache.writeSyncStatus(command.customerId());
-        }
+        registerConsents(command, termsById);
 
         ConsentReceipt receipt = new ConsentReceipt(Instant.now(clock));
 
@@ -151,17 +149,15 @@ public class CreateConsentUseCase implements CreateConsentPort {
     }
 
 
-    private boolean registerConsents(CreateConsentCommand command, Map<UUID, TermsCatalogEntry> termsById) {
+    private void registerConsents(CreateConsentCommand command, Map<UUID, TermsCatalogEntry> termsById) {
         List<TermsCatalogEntry> termsToRegister = termsToRegister(command, termsById);
         if (termsToRegister.isEmpty()) {
-            return false;
+            return;
         }
 
         Instant acceptedAt = Instant.now(clock);
         transactionRunner.runInTransaction(() ->
                 termsToRegister.forEach(term -> register(command, term, acceptedAt)));
-
-        return termsToRegister.stream().anyMatch(TermsCatalogEntry::requiresPostProcessingStep);
     }
 
     private List<TermsCatalogEntry> termsToRegister(CreateConsentCommand command,
@@ -208,6 +204,7 @@ public class CreateConsentUseCase implements CreateConsentPort {
         if (term.requiresPostProcessingStep()) {
             consentEventOutbox.publish(consent.customerId(),
                     consentMapper.toEvent(consent, term, command.signature()));
+            consentCache.ensureProcessing(consent.customerId(), term.termCode());
         }
     }
 }

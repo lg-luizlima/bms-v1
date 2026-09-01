@@ -114,7 +114,7 @@ class CreateConsentUseCaseTest {
         assertThat(eventCaptor.getValue().templateId()).isEqualTo(REVOKED_TEMPLATE_ID);
         assertThat(eventCaptor.getValue().termCode()).isEqualTo(REVOKED_TERM_CODE);
 
-        verify(consentCache).writeSyncStatus(CUSTOMER_ID);
+        verify(consentCache).ensureProcessing(CUSTOMER_ID, REVOKED_TERM_CODE);
         verify(consentCache).writeCacheIdempotentResponse(CUSTOMER_ID, CORRELATION_ID, NOW);
     }
 
@@ -131,7 +131,7 @@ class CreateConsentUseCaseTest {
 
         verify(customerConsentRepository).save(any());
         verifyNoInteractions(consentEventOutbox);
-        verify(consentCache, never()).writeSyncStatus(anyString());
+        verify(consentCache, never()).ensureProcessing(anyString(), anyString());
     }
 
     @Test
@@ -156,7 +156,7 @@ class CreateConsentUseCaseTest {
 
         verify(customerConsentRepository, never()).save(any());
         verifyNoInteractions(consentEventOutbox, transactionRunner);
-        verify(consentCache, never()).writeSyncStatus(anyString());
+        verify(consentCache, never()).ensureProcessing(anyString(), anyString());
     }
 
     @Test

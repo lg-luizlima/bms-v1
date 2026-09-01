@@ -103,7 +103,7 @@ jdbc:
 
 redis:
   ttl:
-    sync-status-seconds: ${SYNC_STATUS_TTL_REDIS:86400}
+    sync-consent-status-seconds: ${SYNC_CONSENT_STATUS_TTL_REDIS:86400}
     consent-idempotency-check-seconds: ${CONSENT_IDEMPOTENCY_CHECK_TTL_REDIS:60}
 
 observability:
