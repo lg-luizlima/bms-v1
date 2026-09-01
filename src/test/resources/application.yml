@@ -6,7 +6,7 @@ tlf:
 
 spring:
   application:
-    name: core-architecture-ri
+    name: ms-vivopay-credit-consent-bms
   datasource:
     url: jdbc:h2:mem:AZ;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     username: sa
@@ -41,7 +41,7 @@ springdoc:
   #version: '@project.version@'
   swagger-ui:
     use-root-path: true
-    
+
 eureka:
   client:
     enabled: false
@@ -62,6 +62,6 @@ lib-security:
 crypto:
   enabled: false
   secret:
-    key: vORmLYFed8BqC6f5mDIVkQ==     
-       
-    
+    key: vORmLYFed8BqC6f5mDIVkQ==
+
+

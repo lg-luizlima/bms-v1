@@ -53,7 +53,7 @@ public class CustomerConsentJpaEntity {
     @Column(name = "accepted_at", nullable = false)
     private Instant acceptedAt;
 
-    @Column(name = "expires_at", nullable = false)
+    @Column(name = "expires_at")
     private Instant expiresAt;
 
     @JdbcTypeCode(SqlTypes.JSON)

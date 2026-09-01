@@ -87,10 +87,10 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
-      timeout: 60000
+      timeout: ${REDIS_TIMEOUT:10000}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:5000}
       ssl:
         enabled: ${REDIS_SSL:true}
-      
   thread-executor: virtual
 jdbc:
   includes: connection,query
@@ -103,12 +103,12 @@ jdbc:
 
 redis:
   ttl:
-    sync-status-seconds: ${SYNC_STATUS_TTL_REDIS:86400}
+    sync-consent-status-seconds: ${SYNC_CONSENT_STATUS_TTL_REDIS:86400}
     consent-idempotency-check-seconds: ${CONSENT_IDEMPOTENCY_CHECK_TTL_REDIS:60}
 
 observability:
   pii:
-    redis-values-enabled: ${OBSERVABILITY_PII_REDIS_VALUES:true}
+    redis-values-enabled: ${OBSERVABILITY_PII_REDIS_VALUES:false}
   noise-reduction:
     health-endpoints-enabled: ${OTEL_HEALTH_ENDPOINTS_ENABLED:true}
 

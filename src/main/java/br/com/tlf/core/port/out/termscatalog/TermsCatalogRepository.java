@@ -1,10 +1,17 @@
 package br.com.tlf.core.port.out.termscatalog;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
-import br.com.tlf.core.domain.vo.terms.TermsCatalogVO;
+import br.com.tlf.core.domain.terms.TermsCatalog;
+import br.com.tlf.core.domain.terms.TermsCatalogEntry;
 
 public interface TermsCatalogRepository {
 
-    List<TermsCatalogVO> findLatestActiveByProduct(String product);
+    List<TermsCatalogEntry> findByIds(List<UUID> termIds);
+
+    TermsCatalog findVigentTerms(String product);
+
+    Map<String, TermsCatalog> findVigentTermsGroupedByProduct();
 }
