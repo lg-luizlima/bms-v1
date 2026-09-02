@@ -1,13 +1,10 @@
 FROM acrsharedservices01.azurecr.io/docker.io/library/eclipse-temurin:21-jre-alpine
 
-RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories \ 
+RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories \
     && apk update \
     && apk upgrade --no-cache --available \
-    && apk add --no-cache --upgrade musl@edge musl-utils@edge \ 
+    && apk add --no-cache --upgrade musl@edge musl-utils@edge \
     && rm -rf /var/cache/apk/*
-
-RUN addgroup -g 1000 -S app && \
-    adduser -u 1000 -S app -G app        
 
 ARG APPLICATION_NAME
 ENV APPLICATION_NAME=$APPLICATION_NAME
