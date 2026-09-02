@@ -4,7 +4,9 @@ RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/rep
     && apk update \
     && apk upgrade --no-cache --available \
     && apk add --no-cache --upgrade musl@edge musl-utils@edge \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/cache/apk/* \
+
+RUN addgroup -S app && adduser -S app -G app
 
 ARG APPLICATION_NAME
 ENV APPLICATION_NAME=$APPLICATION_NAME
