@@ -1,4 +1,3 @@
-# NUNCA DEFINA VALORES SECRETOS AQUI. Utilize o secrets.yml na raiz do .azuredevops
 env:
 - name: SPRING_PROFILES_ACTIVE
   value: hml
