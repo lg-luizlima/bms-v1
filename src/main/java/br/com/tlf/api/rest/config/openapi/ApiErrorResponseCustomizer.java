@@ -24,7 +24,7 @@ import lombok.RequiredArgsConstructor;
  * Builds each error response's description and examples from {@link ApiErrorResponse} (registry-derived
  * examples, grouped by status) and {@link ApiErrorExampleOverride} (a full custom body for one code that
  * the registry can't represent, e.g. a bean-validation `errors[]` entry). Both read from — or are built
- * with the same illustrative constants as — the single source of truth {@code ApiExceptionHandler` uses.
+ * with the same illustrative constants as — the single source of truth {@code ApiExceptionHandler} uses.
  * Requires the matching {@code @ApiResponse(responseCode = ...)} skeleton to already exist (schema
  * linkage stays declarative).
  */
