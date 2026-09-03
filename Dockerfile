@@ -4,10 +4,7 @@ RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/rep
     && apk update \
     && apk upgrade --no-cache --available \
     && apk add --no-cache --upgrade musl@edge musl-utils@edge \
-    && rm -rf /var/cache/apk/* \
-
-RUN addgroup -g 1000 -S app && \
-    adduser -u 1000 -S app -G app
+    && rm -rf /var/cache/apk/*
 
 ARG APPLICATION_NAME
 ENV APPLICATION_NAME=$APPLICATION_NAME
@@ -38,6 +35,11 @@ ENV JAVA_OPTS="\
 -XX:+UseContainerSupport \
 -Djava.security.egd=file:/dev/./urandom"
 
+RUN echo "#!/bin/sh" >> ./entrypoint.sh
+RUN echo "java $JAVA_OPTS -jar $JAR_NAME" >> ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+
+RUN addgroup -S app && adduser -S app -G app
 
 USER app
 
