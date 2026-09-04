@@ -1,5 +1,6 @@
 package br.com.tlf.infrastructure.cache.redis;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -32,10 +33,13 @@ public class RedisConsentCacheAdapter implements ConsentCachePort {
     public Optional<Instant> findIdempotentResponse(String customerId, String correlationId) {
         String key = RedisKeys.postConsentIdempotency(customerId, correlationId);
 
+        log.info("[findIdempotentResponse] Checking idempotency cache for correlationId: {} with key: {}", correlationId, key);
+
         String cachedValue = observed("redis.idempotency.read", "GET post_consent_idempotency", "GET", key, null,
                 () -> redisTemplate.opsForValue().get(key),
-                ex -> log.warn("[findIdempotentResponse] Redis unavailable, treating as cache miss "
-                        + "(idempotency window not enforced for correlationId: {}): {}", correlationId, ex.getMessage()));
+                ex -> log.info("[findIdempotentResponse] Redis unavailable, treating as cache miss "
+                        + "(idempotency window not enforced for correlationId: {}, key: {})",
+                        correlationId, key, ex.getMessage()));
 
         return Optional.ofNullable(cachedValue).map(Instant::parse);
     }
@@ -44,25 +48,43 @@ public class RedisConsentCacheAdapter implements ConsentCachePort {
     public void writeCacheIdempotentResponse(String customerId, String correlationId, Instant consentReceivedAt) {
         String key = RedisKeys.postConsentIdempotency(customerId, correlationId);
         String value = consentReceivedAt.toString();
+        Duration ttlDuration = ttl.consentIdempotencyCheck();
 
-        observed("redis.idempotency.write", "SET post_consent_idempotency", "SET", key, value,
+        if (ttlDuration.isZero() || ttlDuration.isNegative()) {
+            log.error("[writeCacheIdempotentResponse] Invalid TTL configured for idempotency key "
+                    + "(correlationId: {}, key: {}, ttl: {}). Skipping Redis write.",
+                    correlationId, key, ttlDuration);
+            return;
+        }
+
+        log.info("[writeCacheIdempotentResponse] Caching idempotency response for correlationId: {} with key: {} and value: {}", correlationId, key, value);
+
+        Boolean writeSucceeded = observed("redis.idempotency.write", "SET post_consent_idempotency", "SET", key, value,
                 () -> {
-                    redisTemplate.opsForValue().set(key, value, ttl.consentIdempotencyCheck());
-                    return null;
+                    redisTemplate.opsForValue().set(key, value, ttlDuration);
+                    return Boolean.TRUE;
                 },
                 ex -> log.warn("[writeCacheIdempotentResponse] Redis unavailable, idempotency response not cached "
-                        + "for correlationId: {}: {}", correlationId, ex.getMessage()));
+                        + "for correlationId: {}, key: {}, ttl: {}",
+                        correlationId, key, ttlDuration, ex));
+
+        if (Boolean.TRUE.equals(writeSucceeded)) {
+            log.info("[writeCacheIdempotentResponse] Idempotency response cached successfully for correlationId: {}",
+                    correlationId);
+        }
     }
 
     @Override
     public void ensureProcessing(String customerId, String termCode) {
         String key = RedisKeys.syncConsentStatus(customerId);
 
+    log.info("[ensureProcessing] Ensuring processing status for customerId: {} and termCode: {} with key: {}", customerId, termCode, key);
+
         Boolean fieldWasAbsent = observed("redis.consent_status.ensure_processing", "HSETNX sync_consent_status",
                 "HSETNX", key, PROCESSING,
                 () -> redisTemplate.<String, String>opsForHash().putIfAbsent(key, termCode, PROCESSING),
-                ex -> log.warn("[ensureProcessing] Redis unavailable, status not cached for termCode {}: {}",
-                        termCode, ex.getMessage()));
+                ex -> log.warn("[ensureProcessing] Redis unavailable, status not cached for termCode: {}, key: {}",
+                        termCode, key, ex.getMessage()));
 
         if (Boolean.TRUE.equals(fieldWasAbsent)) {
             observed("redis.consent_status.expire", "EXPIRE sync_consent_status", "EXPIRE", key, null,
@@ -70,8 +92,8 @@ public class RedisConsentCacheAdapter implements ConsentCachePort {
                         redisTemplate.expire(key, ttl.syncConsentStatus());
                         return null;
                     },
-                    ex -> log.warn("[ensureProcessing] Redis unavailable, TTL not set for termCode {}: {}",
-                            termCode, ex.getMessage()));
+                    ex -> log.warn("[ensureProcessing] Redis unavailable, TTL not set for termCode: {}, key: {}",
+                            termCode, key, ex));
         }
     }
 

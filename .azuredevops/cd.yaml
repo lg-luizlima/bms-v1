@@ -23,9 +23,9 @@ resources:
             - homolog
 
 extends:
-  template: /tech_products/fintech/pipeline/cd/deploy-helm/vvpp.yaml@CodePlay 
+  template: /tech_products/fintech/pipeline/cd/deploy-helm/vvpp.yaml@CodePlay
   parameters:
     variableGroupName: ms-vivopay-credit-consent-bms-v1
     helmChartName: generic-java-debezium
     helmRepoName: helm/ccvp
-    helmChartVersion: 1.0.16
+    helmChartVersion: 1.0.17
