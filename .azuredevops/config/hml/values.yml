@@ -283,7 +283,7 @@ debezium:
   extraEnvVars:
     - name: EXTRA_CONNECTOR
       value: cassandra-5
-    - name: QUARKUS_LOG_LEVEL
-      value: "INFO"
-    - name: QUARKUS_LOG_CATEGORY__IO_DEBEZIUM_CONNECTOR_BASE_CHANGEEVENTQUEUE__LEVEL
-      value: "INFO"
+
+  quarkusConfig:
+    quarkus.log.level: "DEBUG"
+    quarkus.log.category."io.debezium.connector.base.ChangeEventQueue".level: "INFO"
