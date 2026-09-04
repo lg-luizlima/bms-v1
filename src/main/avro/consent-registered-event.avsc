@@ -9,7 +9,7 @@
     { "name": "templateId", "type": "string", "doc": "Identifier of the rendered term template in Carbone." },
     { "name": "termId", "type": "string", "doc": "UUID serialized as string, matching ConsentEventPayloadVO.termId." },
     { "name": "optIn", "type": "boolean", "doc": "Indicates if the customer explicitly accepted (true) or rejected (false) the term." },
-    { "name": "expiresAt", "type": "string", "doc": "UTC timestamp (ISO-8601) when this consent authorization expires." },
+    { "name": "expiresAt", "type": ["null", "string"], "default": null, "doc": "UTC timestamp (ISO-8601) when this consent authorization expires. Null when the accepted term has no expiry (tb_terms.validity_days IS NULL)." },
     {
       "name": "signature",
       "doc": "Audit metadata evidence captured when the customer action was recorded.",

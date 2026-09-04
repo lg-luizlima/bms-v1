@@ -56,6 +56,36 @@ class PublishedPayloadContractTest {
     }
 
     @Test
+    void outboxPayloadKeepsExpiresAtAsExplicitJsonNullForTermsWithNoExpiry() {
+        ConsentRegisteredEvent event = ConsentRegisteredEvent.builder()
+                .customerId("52998224725")
+                .termCode("GENERAL_CREDIT_TERMS")
+                .templateId("template-general-credit-terms-v1")
+                .termId(TERM_ID)
+                .optIn(Boolean.TRUE)
+                .expiresAt(null)
+                .signature(ConsentRequestDummies.signature())
+                .build();
+
+        String json = jsonSerializer.toJson(outboxMapper.toPayload(event));
+
+        assertThat(json).isEqualTo("{"
+                + "\"customerId\":\"52998224725\","
+                + "\"termCode\":\"GENERAL_CREDIT_TERMS\","
+                + "\"templateId\":\"template-general-credit-terms-v1\","
+                + "\"termId\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\","
+                + "\"optIn\":true,"
+                + "\"expiresAt\":null,"
+                + "\"signature\":{"
+                + "\"ip\":\"192.168.0.1\","
+                + "\"userAgent\":\"Mozilla/5.0\","
+                + "\"deviceId\":\"device-abc-001\","
+                + "\"channel\":\"MOBILE\","
+                + "\"geolocation\":{\"lat\":\"-23.5505\",\"lon\":\"-46.6333\"}"
+                + "}}");
+    }
+
+    @Test
     void eventHubPayloadMirrorsTheInboundRequestBody() {
         String json = jsonSerializer.toJson(eventHubMapper.toEvent(
                 List.of(ConsentRequestDummies.acceptedRevokedTerm()), ConsentRequestDummies.signature()));
