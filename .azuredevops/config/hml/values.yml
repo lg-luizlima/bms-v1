@@ -284,6 +284,6 @@ debezium:
     - name: EXTRA_CONNECTOR
       value: cassandra-5
     - name: QUARKUS_LOG_LEVEL
-      value: "DEBUG"
+      value: "INFO"
     - name: QUARKUS_LOG_CATEGORY__IO_DEBEZIUM_CONNECTOR_BASE_CHANGEEVENTQUEUE__LEVEL
       value: "INFO"
