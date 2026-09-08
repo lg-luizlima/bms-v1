@@ -29,7 +29,7 @@ public interface ConsentMapper {
     @Mapping(target = "customerId", source = "consent.customerId")
     @Mapping(target = "termCode", source = "consent.termCode")
     @Mapping(target = "templateId", source = "term.templateId")
-    @Mapping(target = "termId", source = "consent.termId")
+    @Mapping(target = "termId", source = "consent.id")
     @Mapping(target = "optIn", source = "consent.optIn")
     @Mapping(target = "expiresAt", expression = "java(consent.expiresAt() == null ? null : consent.expiresAt().toString())")
     @Mapping(target = "signature", source = "signature")
