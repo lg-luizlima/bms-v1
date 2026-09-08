@@ -7,7 +7,7 @@
     { "name": "customerId", "type": "string", "doc": "CPF customer identifier related to the consent." },
     { "name": "termCode", "type": "string", "doc": "Business code of the term accepted by the customer." },
     { "name": "templateId", "type": "string", "doc": "Identifier of the rendered term template in Carbone." },
-    { "name": "termId", "type": "string", "doc": "UUID serialized as string, matching ConsentEventPayloadVO.termId." },
+    { "name": "termId", "type": "string", "doc": "UUID serialized as string, matching tb_customer_consents.id." },
     { "name": "optIn", "type": "boolean", "doc": "Indicates if the customer explicitly accepted (true) or rejected (false) the term." },
     { "name": "expiresAt", "type": ["null", "string"], "default": null, "doc": "UTC timestamp (ISO-8601) when this consent authorization expires. Null when the accepted term has no expiry (tb_terms.validity_days IS NULL)." },
     {

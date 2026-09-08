@@ -199,12 +199,12 @@ public class CreateConsentUseCase implements CreateConsentPort {
 
         CustomerConsent consent = consentMapper.toCustomerConsent(command, term, acceptedTerm, acceptedAt);
 
-        customerConsentRepository.save(consent);
+        CustomerConsent consentSaved = customerConsentRepository.save(consent);
 
         if (term.requiresPostProcessingStep()) {
-            consentEventOutbox.publish(consent.customerId(),
-                    consentMapper.toEvent(consent, term, command.signature()));
-            consentCache.ensureProcessing(consent.customerId(), term.termCode());
+            consentEventOutbox.publish(consentSaved.customerId(),
+                    consentMapper.toEvent(consentSaved, term, command.signature()));
+            consentCache.ensureProcessing(consentSaved.customerId(), term.termCode());
         }
     }
 }
