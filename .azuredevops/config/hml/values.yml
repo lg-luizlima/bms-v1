@@ -285,5 +285,5 @@ debezium:
       value: cassandra-5
 
   quarkusConfig:
-    quarkus.log.level: DEBUG
-    quarkus.log.category."io.debezium.connector.base.ChangeEventQueue".level: INFO
+    quarkus.log.level: "DEBUG"
+    quarkus.log.category."io.debezium.connector.base.ChangeEventQueue".level: "INFO"

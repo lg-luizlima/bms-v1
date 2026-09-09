@@ -145,6 +145,9 @@ services:
       CONNECT_REST_ADVERTISED_HOST_NAME: debezium
       CONNECT_REST_PORT: 8083
 
+      CONNECT_LOG4J_ROOT_LOGLEVEL: DEBUG
+      CONNECT_LOG4J_LOGGERS: "io.debezium.connector.base.ChangeEventQueue=INFO"
+
   connect-init:
     image: curlimages/curl:8.9.1
     container_name: connect-init
