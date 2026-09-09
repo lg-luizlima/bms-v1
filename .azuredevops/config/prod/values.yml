@@ -256,7 +256,7 @@ debezium:
     bootstrapServers: "pkc-12pd3.brazilsouth.azure.confluent.cloud:9092"
 
   database:
-    host: sql-pixparcel-prod.postgres.database.azure.com
+    host: sql-credit-consent-test.postgres.database.azure.com
     port: 5432
     name: db_credit_consent
     schema: "public"
