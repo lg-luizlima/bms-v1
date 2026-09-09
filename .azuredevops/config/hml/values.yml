@@ -268,7 +268,7 @@ debezium:
     bootstrapServers: "pkc-12pd3.brazilsouth.azure.confluent.cloud:9092"
 
   database:
-    host: 10.11.0.100
+    host: sql-test-fintech.postgres.database.azure.com
     port: 5432
     name: db_credit_consent
     schema: "public"
@@ -285,5 +285,5 @@ debezium:
       value: cassandra-5
 
   quarkusConfig:
-    quarkus.log.level: "DEBUG"
-    quarkus.log.category."io.debezium.connector.base.ChangeEventQueue".level: "INFO"
+    quarkus.log.level: DEBUG
+    quarkus.log.category."io.debezium.connector.base.ChangeEventQueue".level: INFO

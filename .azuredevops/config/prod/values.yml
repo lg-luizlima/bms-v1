@@ -8,7 +8,7 @@ serviceAccount:
 
 # See https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
 podAnnotations: {}
-  
+
 # See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 podSecurityContext: {}
   # fsGroup: 2000
@@ -47,7 +47,7 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
   hosts:
     - host: ms-vivopay-credit-consent-bms-v1.private.prod
-      paths: 
+      paths:
       - "/"
   tls: []
 
@@ -84,7 +84,7 @@ ingress:
   #     metricName: http_requests_total
   #     threshold: '100'
   #     query: sum(rate(http_requests_total{deployment="my-deployment"}[2m])) # Note: query must return a vector/scalar single element response
-  
+
   ## See https://keda.sh/docs/1.5/scalers/azure-service-bus/
   # - type: azure-servicebus
   #   metadata:
@@ -99,7 +99,7 @@ ingress:
   #     connection: SERVICEBUS_CONNECTIONSTRING_ENV_NAME # This must be a connection string for a queue itself, and not a namespace level (e.g. RootAccessPolicy) connection string [#215](https://github.com/kedacore/keda/issues/215)
   #     # Optional
   #     queueLength: "5" # Optional. Subscription length target for HPA. Default: 5 messages
-  
+
   ## see https://keda.sh/docs/1.5/scalers/aws-sqs/
   # - type: aws-sqs-queue
   #   metadata:
@@ -107,9 +107,9 @@ ingress:
   #     queueURL: https://sqs.eu-west-1.amazonaws.com/account_id/QueueName
   #     queueLength: "5"  # Default: "5"
   #     # Required: awsRegion
-  #     awsRegion: "eu-west-1" 
+  #     awsRegion: "eu-west-1"
   #     identityOwner: pod | operator # Optional. Default: pod
-    
+
 # See https://istio.io/
 # istio:
 #   # Enabled istio service mesh
@@ -124,17 +124,17 @@ ingress:
 #       # The maximum number of connections to a backend. Any excess connection will be pending in
 #       # a queue. You can modify this number by changing the maxConnections field.
 #       maxConnections: 10
-#       # The maximum number of pending requests to a backend. Any excess pending requests will be 
+#       # The maximum number of pending requests to a backend. Any excess pending requests will be
 #       # denied. You can modify this number by changing the http1MaxPendingRequests field.
 #       http1MaxPendingRequests: 50
-#       # The maximum number of requests in a cluster at any given time. You can modify this 
+#       # The maximum number of requests in a cluster at any given time. You can modify this
 #       # number by changing the maxRequestsPerConnection field.
-#       maxRequestsPerConnection: 10 
+#       maxRequestsPerConnection: 10
 #   # See https://istio.io/latest/docs/reference/config/networking/virtual-service/
 #   virtualService:
-#     hosts: 
+#     hosts:
 #       - "microservice.example"
-    
+
 #     # See https://istio.io/latest/docs/reference/config/networking/virtual-service/#CorsPolicy
 #     allowOrigins: ["*"]
 #     allowCredentials: True
@@ -212,7 +212,7 @@ eureka:
     appGroupName: "core-crédito-vivo-pay"
     statusPageUrlPath: "/actuator/info"
     healthCheckUrlPath: "/actuator/health"
-    
+
 # Additional keys that will be added to the configmap.
 # See the examples below.
 configMapKeys: {}
@@ -220,7 +220,7 @@ configMapKeys: {}
 
   # configuration: |
   #   #!/bin/bash
-  #   echo teste ..  
+  #   echo teste ..
 
 # Environment variables that will be used by the worker.
 # See the example below.
@@ -230,7 +230,7 @@ applicationVariables: []
 
 # - name: MY_VARIABLE_NAME2
 #   valueFrom:
-#     configMapKeyRef:    
+#     configMapKeyRef:
 #       name: MY_CONFIGMAP_NAME
 #       key:  MY_CONFIGMAP_KEY
 
@@ -247,3 +247,31 @@ volumeMounts:
 #  mountPath: /my_volume
 #- name: my-volume-2
 #  mountPath: /my_volume_2
+
+debezium:
+  enabled: true
+  serverName: postgres-cdc-credit-consent-bms-v1
+
+  kafka:
+    bootstrapServers: "pkc-12pd3.brazilsouth.azure.confluent.cloud:9092"
+
+  database:
+    host: sql-pixparcel-prod.postgres.database.azure.com
+    port: 5432
+    name: db_credit_consent
+    schema: "public"
+
+  publicationName: credit_consent_bms_outbox_publication
+  slotName: credit_consent_bms_outbox_slot
+  topicPrefix: prod.debezium
+  tableIncludeList: public.tb_outbox_events
+
+  valueFormat: avro
+
+  extraEnvVars:
+    - name: EXTRA_CONNECTOR
+      value: cassandra-5
+
+  quarkusConfig:
+    quarkus.log.level: DEBUG
+    quarkus.log.category."io.debezium.connector.base.ChangeEventQueue".level: INFO
