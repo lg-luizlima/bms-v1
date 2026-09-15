@@ -84,6 +84,8 @@ spring:
     redis:
       host: 127.0.0.1
       port: 6379
+      username: ${REDIS_USERNAME:core-consent}
+      password: ${REDIS_PASSWORD:TWf_YG7X0AIq142j7w_rCiI-D6MJS2LgpAZCAJiPJVf=}
   thread-executor: virtual
 
 jdbc:

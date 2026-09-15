@@ -267,12 +267,6 @@ debezium:
   kafka:
     bootstrapServers: "pkc-12pd3.brazilsouth.azure.confluent.cloud:9092"
 
-  database:
-    host: sql-credit-consent-test.postgres.database.azure.com
-    port: 5432
-    name: db_credit_consent
-    schema: "public"
-
   publicationName: credit_consent_bms_outbox_publication
   slotName: credit_consent_bms_outbox_slot
   topicPrefix: test.debezium
@@ -292,7 +286,7 @@ debezium:
         </encoder>
       </appender>
       <logger name="io.debezium.connector.base.ChangeEventQueue" level="INFO"/>
-      <root level="DEBUG">
+      <root level="INFO">
         <appender-ref ref="STDOUT"/>
       </root>
     </configuration>
