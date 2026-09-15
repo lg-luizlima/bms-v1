@@ -58,7 +58,7 @@ spring:
   application:
     name: ms-vivopay-credit-consent-bms
   datasource:
-    base-url: ${DATABASE_URL}
+    base-url: jdbc:postgresql://${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_NAME}
     url: ${spring.datasource.base-url}
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
