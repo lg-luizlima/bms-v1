@@ -36,14 +36,27 @@ Current transition architecture:
 
 ### Local CDC assets
 
-All Debezium/Kafka Connect config lives in `debezium/` (see `debezium/README.md` — local env
-setup + guide for configuring the equivalent connector in HML/prod; every new outbox-routed
-topic, even one owned by another service like the worker, needs its connector config added
-here too, since this repo owns provisioning the Debezium listener in every environment):
+Local Debezium runs as a standalone **Debezium Server** (Quarkus, `quay.io/debezium/server:3.6`
++ Avro jars copied at build time — see `debezium/Dockerfile`), the same runtime HML/prod use via
+the Debezium Operator's `DebeziumServer` CRD (`helm-chart-generic-java-debezium`) — not Kafka
+Connect. All config lives in `debezium/` (see `debezium/README.md` — local env setup + guide for
+configuring the equivalent in HML/prod; every new outbox-routed topic, even one owned by another
+service like the worker, needs its connector config added here too, since this repo owns
+provisioning the Debezium listener in every environment):
 
-- `debezium/debezium-docker-compose.yaml` — local PostgreSQL + Kafka + Debezium Connect + Kafka UI.
-- `debezium/debezium.json` — connector config for `public.tb_outbox_events` (this repo's own outbox).
-- `debezium/debezium-worker-outbox.json` — connector config for `credit_consent_worker.tb_outbox_events` (`ms-vivopay-credit-consent-worker-v1`'s own outbox, → `vivopay.credit.engine.events.v1`).
+- `debezium/debezium-docker-compose.yaml` — local PostgreSQL + Kafka + Debezium Server + Kafka UI.
+  The `debezium` service is configured entirely via `DEBEZIUM_SINK_*`/`DEBEZIUM_SOURCE_*`/
+  `DEBEZIUM_FORMAT_*` env vars (no REST registration step) — captures only `public.tb_outbox_events`
+  (this repo's own outbox), matching what HML/prod actually capture today.
+- `debezium/debezium.json` — reference-only, field-by-field documentation of that same connector
+  config in Kafka-Connect-JSON shape; not applied anywhere anymore (superseded by the env vars
+  above), kept because the field names still match `spec.source.config` on the HML/prod CRD.
+- The worker's own outbox (`credit_consent_worker.tb_outbox_events`, →
+  `vivopay.credit.engine.events.v1`) has **no Debezium connector configured in any environment
+  today** — not locally, not in HML/prod (Debezium Server only runs one source per instance). A
+  `debezium/debezium-worker-outbox.json` reference file used to document what that connector would
+  look like; it was removed since it never matched anything actually running. If this capture gets
+  implemented, follow the same field pattern as `debezium.json` when adding it back.
 
 ### Event Hub parallel mode
 

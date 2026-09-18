@@ -108,76 +108,95 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
 
+  # Runs as a standalone Debezium Server (Quarkus), the same runtime HML/prod run via the
+  # Debezium Operator's DebeziumServer CRD (helm-chart-generic-java-debezium/templates/debezium.yaml)
+  # — not a Kafka Connect worker. There is no REST API to register connectors against; capture
+  # starts on boot straight from this container's own env vars (mirrors spec.sink/spec.source/
+  # spec.format on that CRD). See ../debezium/README.md for the full mapping.
   debezium:
     build:
       context: .
-    image: ms-vivopay-credit-consent-debezium-avro:2.7.0.Final
+    image: ms-vivopay-credit-consent-debezium-server-avro:3.6
     container_name: debezium
     hostname: debezium
+    restart: unless-stopped # keeps retrying until tb_outbox_events exists (created by the BMS's own Flyway migration on boot)
     depends_on:
       - kafka
       - postgres
       - schema-registry
     ports:
-      - "8083:8083"
+      - "8083:8080" # Quarkus health/metrics (/q/health) — no longer a connector-management REST API
+    volumes:
+      - debezium_data:/debezium/data
     environment:
 
-      CONNECT_BOOTSTRAP_SERVERS: kafka:29092
+      # sink — Kafka producer. HML/prod point this at Confluent Cloud over SASL_SSL/PLAIN; locally
+      # there's no real Confluent Cloud, so this targets the compose's own PLAINTEXT Kafka instead —
+      # same config shape, local endpoint.
+      DEBEZIUM_SINK_TYPE: kafka
+      DEBEZIUM_SINK_KAFKA_PRODUCER_BOOTSTRAP_SERVERS: kafka:29092
+      DEBEZIUM_SINK_KAFKA_PRODUCER_KEY_SERIALIZER: org.apache.kafka.common.serialization.StringSerializer
+      DEBEZIUM_SINK_KAFKA_PRODUCER_VALUE_SERIALIZER: org.apache.kafka.common.serialization.ByteArraySerializer
 
-      CONNECT_GROUP_ID: 1
+      # source — same Postgres connector config as debezium.json (reference-only now, see README),
+      # translated to Debezium Server's DEBEZIUM_SOURCE_* env var form. Only the BMS's own outbox is
+      # captured here, matching HML/prod's tableIncludeList today — see plan/README for the worker
+      # outbox gap this mirrors.
+      DEBEZIUM_SOURCE_CONNECTOR_CLASS: io.debezium.connector.postgresql.PostgresConnector
+      DEBEZIUM_SOURCE_DATABASE_HOSTNAME: postgres
+      DEBEZIUM_SOURCE_DATABASE_PORT: 5432
+      DEBEZIUM_SOURCE_DATABASE_USER: postgres
+      DEBEZIUM_SOURCE_DATABASE_PASSWORD: postgres
+      DEBEZIUM_SOURCE_DATABASE_DBNAME: credit_consent
+      DEBEZIUM_SOURCE_PLUGIN_NAME: pgoutput
+      DEBEZIUM_SOURCE_TOPIC_PREFIX: credit-consent-cdc
+      DEBEZIUM_SOURCE_SLOT_NAME: credit_consent_outbox_slot
+      DEBEZIUM_SOURCE_PUBLICATION_NAME: credit_consent_publication
+      # Debezium Server's own default offset-file path resolves to the debezium_data volume's
+      # mount point itself rather than a file inside it (fails boot with "Is a directory" against
+      # an empty bind-mounted directory) — pin it to an explicit file so the volume works.
+      DEBEZIUM_SOURCE_OFFSET_STORAGE_FILE_FILENAME: /debezium/data/offsets.dat
+      DEBEZIUM_SOURCE_PUBLICATION_AUTOCREATE_MODE: filtered
+      DEBEZIUM_SOURCE_SCHEMA_INCLUDE_LIST: public
+      DEBEZIUM_SOURCE_TABLE_INCLUDE_LIST: public.tb_outbox_events
+      DEBEZIUM_SOURCE_TOMBSTONES_ON_DELETE: "false"
 
-      CONNECT_CONFIG_STORAGE_TOPIC: connect_configs
-      CONNECT_OFFSET_STORAGE_TOPIC: connect_offsets
-      CONNECT_STATUS_STORAGE_TOPIC: connect_statuses
+      DEBEZIUM_SOURCE_TRANSFORMS: outbox
+      DEBEZIUM_SOURCE_TRANSFORMS_OUTBOX_TYPE: io.debezium.transforms.outbox.EventRouter
+      DEBEZIUM_SOURCE_TRANSFORMS_OUTBOX_ROUTE_BY_FIELD: topic_name
+      # Two layers of $$-escaping needed here: compose collapses $$ -> $ on its way into the
+      # container ($$$${routedByValue} -> $${routedByValue}), then Quarkus/SmallRye Config (which
+      # backs Debezium Server's env var config) collapses $$ -> $ again on its way into the
+      # transform ($${routedByValue} -> ${routedByValue}). Skipping either layer makes SmallRye
+      # treat ${routedByValue} as an (unresolvable) config property reference instead of a literal
+      # value, which throws deep inside DebeziumServer.configToProperties at boot — confirmed by
+      # running this image directly and bisecting the config down to this one property.
+      DEBEZIUM_SOURCE_TRANSFORMS_OUTBOX_ROUTE_TOPIC_REPLACEMENT: $$$${routedByValue}
+      DEBEZIUM_SOURCE_TRANSFORMS_OUTBOX_TABLE_EXPAND_JSON_PAYLOAD: "true"
+      DEBEZIUM_SOURCE_TRANSFORMS_OUTBOX_TABLE_FIELD_EVENT_ID: event_id
+      DEBEZIUM_SOURCE_TRANSFORMS_OUTBOX_TABLE_FIELD_EVENT_KEY: aggregate_id
+      DEBEZIUM_SOURCE_TRANSFORMS_OUTBOX_TABLE_FIELD_EVENT_PAYLOAD: payload
+      DEBEZIUM_SOURCE_TRANSFORMS_OUTBOX_TABLE_FIELDS_ADDITIONAL_PLACEMENT: >-
+        aggregate_type:header:eventType,aggregate_id:header:aggregateId,created_at:header:createdAt,event_id:header:eventId,trace_context:header:traceparent
 
-      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      # format — key/headers stay schema-less JSON, value is Avro via the local Schema Registry
+      # (same split HML/prod use, minus SASL/basic-auth since this Schema Registry is local/unauthenticated)
+      DEBEZIUM_FORMAT_KEY: json
+      DEBEZIUM_FORMAT_KEY_SCHEMAS_ENABLE: "false"
+      DEBEZIUM_FORMAT_HEADER: json
+      DEBEZIUM_FORMAT_HEADER_SCHEMAS_ENABLE: "false"
+      DEBEZIUM_FORMAT_VALUE: avro
+      DEBEZIUM_FORMAT_VALUE_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      DEBEZIUM_FORMAT_VALUE_AUTO_REGISTER_SCHEMAS: "true"
 
-      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-
-      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
-      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
-
-      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components
-
-      CONNECT_REST_ADVERTISED_HOST_NAME: debezium
-      CONNECT_REST_PORT: 8083
-
-      CONNECT_LOG4J_ROOT_LOGLEVEL: DEBUG
-      CONNECT_LOG4J_LOGGERS: "io.debezium.connector.base.ChangeEventQueue=INFO"
-
-  connect-init:
-    image: curlimages/curl:8.9.1
-    container_name: connect-init
-    depends_on:
-      - debezium
-    volumes:
-      - ./debezium.json:/tmp/debezium.json:ro
-      - ./debezium-worker-outbox.json:/tmp/debezium-worker-outbox.json:ro
-    command:
-      - sh
-      - -c
-      - |
-        echo "Waiting for Debezium Connect at http://debezium:8083/connectors";
-        until curl -sf http://debezium:8083/connectors > /dev/null; do
-          sleep 3;
-        done;
-        echo "Registering connector credit-consent-outbox-connector";
-        curl -s -X DELETE http://debezium:8083/connectors/credit-consent-outbox-connector > /dev/null || true;
-        curl -sf -X POST \
-          -H 'Content-Type: application/json' \
-          --data @/tmp/debezium.json \
-          http://debezium:8083/connectors;
-        echo "Connector registered.";
-        echo "Registering connector credit-consent-worker-outbox-connector";
-        curl -s -X DELETE http://debezium:8083/connectors/credit-consent-worker-outbox-connector > /dev/null || true;
-        curl -sf -X POST \
-          -H 'Content-Type: application/json' \
-          --data @/tmp/debezium-worker-outbox.json \
-          http://debezium:8083/connectors;
-        echo "Connector registered.";
+      # logging — native Quarkus logging works here (this image never swaps in a different SLF4J
+      # binding, unlike HML/prod's EXTRA_CONNECTOR=cassandra-5 — see Dockerfile), so plain
+      # QUARKUS_LOG_LEVEL is enough; no logbackConfig/JAVA_OPTS hack needed. HML/prod additionally
+      # keep io.debezium.connector.base.ChangeEventQueue at INFO under a DEBUG root via
+      # logbackConfig — the equivalent QUARKUS_LOG_CATEGORY__...__LEVEL override for that one
+      # logger did not take effect when tested against this image/version, so this stays INFO
+      # root instead of chasing a DEBUG root down to noise. Flip to DEBUG here for deep debugging.
+      QUARKUS_LOG_LEVEL: INFO
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.113.0
@@ -251,3 +270,4 @@ volumes:
   tempo_data:
   redis_insight_volume_data:
   loki_data:
+  debezium_data:
