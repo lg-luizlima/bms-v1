@@ -20,7 +20,7 @@ securityContext: {}
   #   - ALL
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
-  # runAsUser: 1000
+# runAsUser: 1000
 
 # See https://kubernetes.io/docs/concepts/services-networking/service/
 service:
@@ -142,19 +142,19 @@ ingress:
 # See https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 resources:
   limits:
-    cpu: 500m
-    memory: 512Mi
+    cpu: 700m
+    memory: 1024Mi
   requests:
     cpu: 300m
     memory: 256Mi
 
 # See https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
 autoscaling:
-  enabled: false
+  enabled: true
   istioEnabled: false
   minReplicas: 1
-  maxReplicas: 1
-  targetCPUUtilizationPercentage:
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 70
 
 # See https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
 nodeSelector: {}
@@ -231,7 +231,7 @@ configMapKeys: {}
 
   # configuration: |
   #   #!/bin/bash
-  #   echo teste ..
+#   echo teste ..
 
 # Environment variables that will be used by the worker.
 # See the example below.
