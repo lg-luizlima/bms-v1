@@ -286,7 +286,7 @@ debezium:
         </encoder>
       </appender>
       <logger name="io.debezium.connector.base.ChangeEventQueue" level="INFO"/>
-      <root level="INFO">
+      <root level="DEBUG">
         <appender-ref ref="STDOUT"/>
       </root>
     </configuration>
