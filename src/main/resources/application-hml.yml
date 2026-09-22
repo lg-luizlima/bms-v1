@@ -87,9 +87,9 @@ spring:
       # Configuração Modo OSSCluster
       cluster:
         nodes: 
-          - ${REDIS_HOST}:${REDIS_PORT}
+          - "${REDIS_HOST}:${REDIS_PORT}"
         max-redirects: 3
-      password: ${REDIS_PASSWORD}
+      password: "${REDIS_PASSWORD}"
       ssl:
         enabled: ${REDIS_SSL:true}
       timeout: ${REDIS_TIMEOUT:10000}
