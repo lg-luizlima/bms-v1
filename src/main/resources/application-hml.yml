@@ -84,13 +84,25 @@ spring:
     locations: classpath:db/migration
   data:
     redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
+      # Configuração Modo OSSCluster
+      cluster:
+        nodes: 
+          - ${REDIS_HOST}:${REDIS_PORT}
+        max-redirects: 3
       password: ${REDIS_PASSWORD}
-      timeout: ${REDIS_TIMEOUT:10000}
-      connect-timeout: ${REDIS_CONNECT_TIMEOUT:5000}
       ssl:
         enabled: ${REDIS_SSL:true}
+      timeout: ${REDIS_TIMEOUT:10000}
+      lettuce:
+        cluster:
+          refresh:
+            adaptive: true
+            period: 60s
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: 3000ms      
   thread-executor: virtual
 jdbc:
   includes: connection,query
