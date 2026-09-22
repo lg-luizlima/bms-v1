@@ -98,6 +98,8 @@ spring:
           refresh:
             adaptive: true
             period: 60s
+        extension:
+          peer-verification: false    
         pool:
           max-active: 16
           max-idle: 8
