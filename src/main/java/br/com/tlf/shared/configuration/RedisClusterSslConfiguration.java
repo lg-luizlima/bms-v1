@@ -1,40 +1,42 @@
 package br.com.tlf.shared.configuration;
 
-import java.net.InetAddress;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.data.redis.autoconfigure.ClientResourcesBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import io.lettuce.core.internal.HostAndPort;
-import io.lettuce.core.resource.MappingSocketAddressResolver;
+import io.lettuce.core.resource.NettyCustomizer;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.Channel;
+import io.netty.handler.ssl.SslHandler;
 
 @Configuration
-@ConditionalOnProperty(name = "spring.data.redis.cluster.nodes")
 public class RedisClusterSslConfiguration {
 
-    private final String redisHost;
-
-    public RedisClusterSslConfiguration(@Value("${REDIS_HOST:}") String redisHost) {
-        this.redisHost = redisHost;
-    }
-
     @Bean
-    public ClientResourcesBuilderCustomizer azureRedisSocketAddressResolver() {
-        return builder -> builder.socketAddressResolver(MappingSocketAddressResolver.create(
-                host -> InetAddress.getAllByName(host),
-                endpoint -> cacheIp(redisHost).equals(endpoint.getHostText())
-                        ? HostAndPort.of(redisHost, endpoint.getPort())
-                        : endpoint));
+    public ClientResourcesBuilderCustomizer azureRedisTlsPeerVerificationCustomizer() {
+        return builder -> builder.nettyCustomizer(new NettyCustomizer() {
+
+            @Override
+            public void afterBootstrapInitialized(Bootstrap bootstrap) {
+            }
+
+            @Override
+            public void afterChannelInitialized(Channel channel) {
+                disableHostnameVerification(channel.pipeline().get(SslHandler.class));
+            }
+        });
     }
 
-    private String cacheIp(String host) {
-        try {
-            return InetAddress.getAllByName(host)[0].getHostAddress();
-        } catch (Exception e) {
-            return host;
+    private static void disableHostnameVerification(SslHandler sslHandler) {
+        if (sslHandler == null) {
+            return;
         }
+        SSLEngine engine = sslHandler.engine();
+        SSLParameters sslParameters = engine.getSSLParameters();
+        sslParameters.setEndpointIdentificationAlgorithm("");
+        engine.setSSLParameters(sslParameters);
     }
 }
